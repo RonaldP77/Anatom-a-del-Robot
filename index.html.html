@@ -1,0 +1,2434 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anatomía del Robot - CyberLab | 7mo Grado EGB</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome para iconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- Google Fonts: Fredoka & Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Three.js r128 & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(180deg, #60a5fa 0%, #93c5fd 55%, #dbeafe 100%);
+    }
+
+    .font-game {
+      font-family: 'Fredoka', sans-serif;
+    }
+
+    /* Lienzo 3D ocupa toda la pantalla */
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #canvas-container:active {
+      cursor: grabbing;
+    }
+
+    /* Capa de interfaz sobre el 3D sin bloquear el arrastre del mouse */
+    /* Etiqueta flotante anclada a la parte 3D del robot */
+    #part-label {
+      position: fixed; left: 0; top: 0; z-index: 12; pointer-events: none;
+      display: flex; align-items: center;
+      opacity: 0; transition: opacity .35s ease;
+      transform: translate(-9999px, -9999px);
+    }
+    #part-label.visible { opacity: 1; }
+    #part-label .pl-pill {
+      display: flex; align-items: center; gap: 8px; white-space: nowrap;
+      background: rgba(15,23,42,.88); color: #fff; border: 2px solid rgba(255,255,255,.85);
+      padding: 6px 14px 6px 6px; border-radius: 999px; font-weight: 800; font-size: 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.4);
+    }
+    #part-label .pl-num {
+      width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: 13px; color: #fff;
+    }
+    #part-label .pl-line { width: 46px; height: 3px; background: #fff; box-shadow: 0 0 8px rgba(34,211,238,.9); }
+    #part-label .pl-dot {
+      width: 14px; height: 14px; border-radius: 50%; background: #22d3ee; border: 3px solid #fff;
+      box-shadow: 0 0 0 0 rgba(34,211,238,.8); animation: plPulse 1.4s infinite;
+    }
+    @keyframes plPulse { 0%{box-shadow:0 0 0 0 rgba(34,211,238,.8);} 100%{box-shadow:0 0 0 16px rgba(34,211,238,0);} }
+    @media (max-width: 767px) { #part-label .pl-line { width: 24px; } #part-label .pl-pill { font-size: 12px; } }
+
+    #ui-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .interactive {
+      pointer-events: auto;
+    }
+
+    /* Título principal estilo CyberLab */
+    .cyber-title {
+      font-family: 'Fredoka', sans-serif;
+      color: #ffffff;
+      text-shadow:
+        0 3px 0 #be185d,
+        0 6px 14px rgba(157, 23, 77, 0.65),
+        -2px -2px 0 #db2777,
+        2px -2px 0 #db2777,
+        -2px 2px 0 #db2777,
+        2px 2px 0 #db2777;
+      letter-spacing: 0.5px;
+    }
+
+    /* Botones estilo cápsula 3D */
+    .btn-glossy-orange {
+      background: linear-gradient(180deg, #fde68a 0%, #f59e0b 55%, #d97706 100%);
+      border: 3px solid #ffffff;
+      box-shadow: 0 6px 0 #b45309, 0 10px 20px rgba(0, 0, 0, 0.25);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .btn-glossy-orange:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 0 #b45309, 0 14px 24px rgba(0, 0, 0, 0.28);
+    }
+    .btn-glossy-orange:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #b45309, 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-glossy-cyan {
+      background: linear-gradient(180deg, #a5f3fc 0%, #38bdf8 52%, #0284c7 100%);
+      border: 3px solid #ffffff;
+      box-shadow: 0 6px 0 #0369a1, 0 10px 20px rgba(0, 0, 0, 0.25);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .btn-glossy-cyan:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 0 #0369a1, 0 14px 24px rgba(0, 0, 0, 0.28);
+    }
+    .btn-glossy-cyan:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #0369a1, 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-glossy-green {
+      background: linear-gradient(180deg, #bbf7d0 0%, #22c55e 52%, #15803d 100%);
+      border: 3px solid #ffffff;
+      box-shadow: 0 6px 0 #166534, 0 10px 20px rgba(0, 0, 0, 0.22);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .btn-glossy-green:hover {
+      transform: translateY(-2px);
+    }
+    .btn-glossy-green:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #166534;
+    }
+
+    .btn-glossy-purple {
+      background: linear-gradient(180deg, #e9d5ff 0%, #a855f7 52%, #7e22ce 100%);
+      border: 3px solid #ffffff;
+      box-shadow: 0 6px 0 #6b21a8, 0 10px 20px rgba(0, 0, 0, 0.22);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .btn-glossy-purple:hover {
+      transform: translateY(-2px);
+    }
+    .btn-glossy-purple:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #6b21a8;
+    }
+
+    /* Tarjetas translúcidas modernas */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.93);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 2px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.2);
+    }
+
+    /* Pantallas ocultas / visibles */
+    .screen {
+      display: none;
+      width: 100%;
+      height: 100%;
+    }
+    .screen.active {
+      display: flex;
+    }
+
+    /* Scrollbar limpio para tarjetas en pantallas pequeñas */
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(226, 232, 240, 0.5);
+      border-radius: 9999px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(56, 189, 248, 0.7);
+      border-radius: 9999px;
+    }
+
+    /* ===== Actividad: relacionar partes ===== */
+    .act-item {
+      width: 100%;
+      text-align: left;
+      padding: 0.7rem 0.85rem;
+      border-radius: 1rem;
+      border: 2px solid #e2e8f0;
+      background: #ffffff;
+      font-weight: 600;
+      color: #334155;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.85rem;
+      line-height: 1.2;
+    }
+    .act-item:hover:not(:disabled) { border-color: #38bdf8; background: #f0f9ff; }
+    .act-item.selected { border-color: #f59e0b; background: #fffbeb; box-shadow: 0 0 0 3px rgba(245,158,11,0.3); transform: scale(1.02); }
+    .act-item.matched { border-color: #22c55e; background: #dcfce7; color: #166534; cursor: default; }
+    .act-item.wrong { border-color: #ef4444; background: #fee2e2; animation: act-shake 0.4s; }
+    @keyframes act-shake {
+      0%,100% { transform: translateX(0); }
+      20%,60% { transform: translateX(-6px); }
+      40%,80% { transform: translateX(6px); }
+    }
+    .lock-badge {
+      position: absolute; top: -6px; right: -6px;
+      width: 28px; height: 28px; border-radius: 9999px;
+      background: #1e293b; color: #fde68a; border: 2px solid #fff;
+      display: none; align-items: center; justify-content: center; font-size: 0.8rem;
+    }
+    .lock-badge.on { display: flex; }
+    .btn-locked { filter: grayscale(0.85) brightness(0.9); }
+    #toast-lock {
+      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(30px);
+      opacity: 0; pointer-events: none; z-index: 50; transition: all 0.3s ease;
+      max-width: 90vw;
+    }
+    #toast-lock.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+  <!-- Contenedor del Mundo 3D Interactivo -->
+  <div id="canvas-container" title="Arrastra para rotar 360° y usa la rueda para acercar"></div>
+
+  <!-- Etiqueta 3D del componente activo -->
+  <div id="part-label"><span class="pl-pill"><span id="part-label-num" class="pl-num"></span><span id="part-label-text"></span></span><span class="pl-line"></span><span class="pl-dot"></span></div>
+
+  <!-- Capa de Interfaz Educativa -->
+  <div id="ui-layer">
+
+    <!-- ========================================================= -->
+    <!-- PANTALLA 1: PORTADA                                       -->
+    <!-- ========================================================= -->
+    <section id="screen-portada" class="screen active flex-col justify-between p-4 sm:p-6">
+      <!-- Cabecera Institucional + Título -->
+      <div class="w-full flex flex-col items-center gap-3">
+        <div class="w-full max-w-6xl flex items-center justify-between gap-2">
+          <!-- Logo Oficial Universidad Nacional de Loja (UNL) -->
+          <div class="interactive bg-white/95 backdrop-blur-md px-3 py-2 rounded-2xl shadow-lg border-2 border-white flex items-center gap-2.5">
+            <svg viewBox="0 0 365 125" class="h-11 sm:h-14 w-auto" xmlns="http://www.w3.org/2000/svg" aria-label="Logo Universidad Nacional de Loja">
+              <!-- Escudo circular izquierdo -->
+              <g transform="translate(58, 56)">
+                <circle cx="0" cy="0" r="46" fill="#111827" stroke="#eab308" stroke-width="3" />
+                <circle cx="0" cy="0" r="35" fill="#15803d" />
+                <path d="M 0,-35 A 35,35 0 0,1 0,35 Z" fill="#dc2626" />
+                <!-- Texto del anillo dorado -->
+                <defs>
+                  <path id="unlRingTop" d="M -38,0 A 38,38 0 1,1 38,0" />
+                  <path id="unlRingBot" d="M 38,0 A 38,38 0 1,1 -38,0" />
+                </defs>
+                <text fill="#facc15" font-size="6.4" font-weight="bold" font-family="serif" letter-spacing="0.4">
+                  <textPath href="#unlRingTop" startOffset="50%" text-anchor="middle">IN THESAURIS SAPIENTIÆ</textPath>
+                </text>
+                <text fill="#facc15" font-size="6.2" font-weight="bold" font-family="serif" letter-spacing="0.4">
+                  <textPath href="#unlRingBot" startOffset="50%" text-anchor="middle">GLORIFICATIO VITÆ</textPath>
+                </text>
+                <!-- Brazos y Antorcha -->
+                <path d="M -16,22 Q -22,4 -14,-12 L -9,-10 Q -12,4 -6,18 Z" fill="#fed7aa" />
+                <!-- Rama oscura en brazo izquierdo -->
+                <path d="M -18,6 L -22,1 M -17,0 L -21,-5 M -16,-6 L -19,-11" stroke="#1f2937" stroke-width="2.2" stroke-linecap="round" />
+                <path d="M 14,22 Q 20,5 13,-10 L 8,-8 Q 10,4 5,18 Z" fill="#fed7aa" />
+                <rect x="8" y="-12" width="7" height="11" rx="1" fill="#1f2937" />
+                <!-- Pergamino blanco central -->
+                <rect x="-4" y="-22" width="8" height="22" rx="3" fill="#ffffff" />
+                <!-- Llamas en la base -->
+                <path d="M -14,22 Q -6,8 0,16 Q 6,6 14,22 Q 5,28 -5,28 Z" fill="#f97316" />
+                <path d="M -8,22 Q 0,12 8,22 Z" fill="#facc15" />
+                <rect x="-9" y="22" width="18" height="6" rx="1" fill="#b45309" />
+              </g>
+              <text x="58" y="117" text-anchor="middle" fill="#1f2937" font-size="12" font-weight="800" font-family="Inter, sans-serif">1859</text>
+
+              <!-- Siglas manuscritas "unl" -->
+              <g transform="translate(122, 22)" fill="none" stroke="#374151" stroke-linecap="round" stroke-linejoin="round">
+                <!-- u -->
+                <path d="M 6,24 C 3,48 4,66 14,66 C 23,66 28,45 31,24 C 29,48 29,65 36,66" stroke-width="6.5" />
+                <!-- n -->
+                <path d="M 46,26 C 46,44 46,58 46,66 M 46,44 C 50,28 68,22 71,40 C 72,50 72,58 72,66" stroke-width="6.5" />
+                <!-- l -->
+                <path d="M 88,6 C 85,32 84,56 89,66 C 93,67 98,62 101,57" stroke-width="6.5" />
+                <!-- Trazo pincel inferior -->
+                <path d="M 2,82 Q 52,75 104,79" stroke-width="4.5" />
+                <path d="M 6,86 Q 54,80 100,83" stroke-width="2.5" />
+              </g>
+
+              <!-- Línea divisoria vertical -->
+              <line x1="236" y1="18" x2="236" y2="105" stroke="#4b5563" stroke-width="2" />
+
+              <!-- Texto Universidad Nacional de Loja -->
+              <text x="246" y="46" fill="#4b5563" font-size="17" font-weight="500" font-family="Inter, sans-serif">Universidad</text>
+              <text x="246" y="68" fill="#4b5563" font-size="17" font-weight="500" font-family="Inter, sans-serif">Nacional</text>
+              <text x="246" y="91" fill="#1f2937" font-size="18" font-weight="800" font-family="Inter, sans-serif">de Loja</text>
+            </svg>
+          </div>
+
+          <!-- Logotipo BETEL derecho -->
+          <div class="interactive bg-white/90 backdrop-blur-md p-2 rounded-full shadow-lg border-2 border-white flex items-center justify-center">
+            <svg viewBox="0 0 100 100" class="w-12 h-12 sm:w-14 sm:h-14" xmlns="http://www.w3.org/2000/svg" aria-label="Logo Betel">
+              <circle cx="50" cy="50" r="44" fill="none" stroke="#166534" stroke-width="6" />
+              <path d="M30 26 L70 26 L70 54 C70 68 50 76 50 76 C50 76 30 68 30 54 Z" fill="none" stroke="#166534" stroke-width="4.5" stroke-linejoin="round" />
+              <circle cx="50" cy="36" r="4" fill="#eab308" />
+              <path d="M37 42 L48 47 L48 63 L37 58 Z" fill="none" stroke="#eab308" stroke-width="3.5" stroke-linejoin="round" />
+              <path d="M63 42 L52 47 L52 63 L63 58 Z" fill="none" stroke="#eab308" stroke-width="3.5" stroke-linejoin="round" />
+              <text x="50" y="88" text-anchor="middle" fill="#166534" font-size="12" font-weight="800" font-family="Inter, sans-serif" letter-spacing="1">BETEL</text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Título Principal y Subtítulo 7mo Grado de EGB -->
+        <div class="text-center px-2 mt-1">
+          <h1 class="cyber-title text-3xl sm:text-5xl md:text-6xl font-bold leading-tight">
+            Anatomía del Robot - CyberLab
+          </h1>
+          <div class="inline-block mt-2 px-5 py-1.5 rounded-full bg-slate-900/75 backdrop-blur-md border-2 border-cyan-300 shadow-lg">
+            <p class="font-game text-cyan-200 text-base sm:text-xl font-bold tracking-wide">
+              7mo Grado de EGB
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra Inferior de la Portada -->
+      <div class="w-full max-w-5xl mx-auto flex items-center justify-between gap-3 pb-2">
+        <!-- Botón "!" Fundamentación Pedagógica -->
+        <button onclick="goToScreen('screen-fundamentacion')" class="interactive btn-glossy-orange px-6 py-3 rounded-full text-white font-game text-2xl sm:text-3xl font-bold flex items-center justify-center min-w-[78px]" title="Fundamentación Pedagógica">
+          !
+        </button>
+
+        <!-- Controles Rápidos 3D Compactos -->
+        <div class="interactive hidden sm:flex items-center gap-2 bg-slate-900/75 backdrop-blur-md px-3 py-2 rounded-full border border-white/30 shadow-lg">
+          <button onclick="toggleExplode()" id="btn-portada-explode" class="px-3.5 py-1.5 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs sm:text-sm transition flex items-center gap-1.5">
+            <i class="fa-solid fa-cubes"></i> Despiece 3D
+          </button>
+          <button onclick="resetCameraView()" class="px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white font-semibold text-xs sm:text-sm transition flex items-center gap-1.5">
+            <i class="fa-solid fa-crosshairs"></i> Centrar
+          </button>
+        </div>
+
+        <!-- Botón "INICIO" -> Menú -->
+        <button onclick="goToScreen('screen-menu')" class="interactive btn-glossy-cyan px-7 py-3 rounded-full text-white font-game text-xl sm:text-2xl font-bold flex items-center gap-2.5 tracking-wide">
+          <i class="fa-solid fa-house text-rose-100 drop-shadow"></i>
+          <span>INICIO</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- PANTALLA 2: FUNDAMENTACIÓN PEDAGÓGICA                     -->
+    <!-- ========================================================= -->
+    <section id="screen-fundamentacion" class="screen flex-col items-center justify-center p-4">
+      <div class="interactive glass-card w-full max-w-3xl rounded-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto custom-scroll">
+        <div class="flex items-center justify-between border-b-2 border-purple-200 pb-4 mb-5">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-2xl shadow-md">
+              <i class="fa-solid fa-graduation-cap"></i>
+            </div>
+            <div>
+              <h2 class="font-game text-2xl sm:text-3xl font-bold text-purple-900">Fundamentación Pedagógica</h2>
+              <p class="text-sm font-semibold text-purple-600">7mo Grado de Educación General Básica (EGB)</p>
+            </div>
+          </div>
+          <span class="px-3 py-1 rounded-full bg-purple-100 text-purple-800 font-bold text-xs">Robótica Educativa</span>
+        </div>
+
+        <div class="space-y-4 text-slate-700 text-sm sm:text-base">
+          <div class="bg-purple-50/90 p-4 rounded-2xl border border-purple-200">
+            <h3 class="font-bold text-purple-900 flex items-center gap-2 mb-1">
+              <i class="fa-solid fa-award text-purple-600"></i> Criterio de Evaluación
+            </h3>
+            <p><strong>Ref. I.CN.3.9.2.</strong> Reconoce los componentes principales de un robot y relaciona cada uno con su función dentro del funcionamiento del sistema.</p>
+          </div>
+
+          <div class="bg-sky-50/90 p-4 rounded-2xl border border-sky-200">
+            <h3 class="font-bold text-sky-900 flex items-center gap-2 mb-1">
+              <i class="fa-solid fa-gears text-sky-600"></i> Destreza con Criterio de Desempeño
+            </h3>
+            <p><strong>Ref. CN.3.3.11.</strong> Identificar las partes principales de un robot y explicar sus funciones mediante la observación de imágenes, modelos y ejemplos de robots utilizados en la vida cotidiana.</p>
+          </div>
+
+          <div class="bg-emerald-50/90 p-4 rounded-2xl border border-emerald-200">
+            <h3 class="font-bold text-emerald-900 flex items-center gap-2 mb-1">
+              <i class="fa-solid fa-bullseye text-emerald-600"></i> Objetivo de Aprendizaje
+            </h3>
+            <p><strong>Ref. O.CN.3.7. / O.R.3.2.</strong> Identificar las partes principales de un robot y explicar la función del controlador, los sensores, los actuadores, la fuente de energía y la estructura física.</p>
+          </div>
+
+          <!-- Autoría y Contacto -->
+          <div class="bg-amber-50/90 p-4 rounded-2xl border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-amber-900 flex items-center gap-2">
+                <i class="fa-solid fa-user-tie text-amber-600"></i> Autor y Desarrollo Pedagógico
+              </h3>
+              <p class="font-semibold text-slate-800 mt-0.5">Ronald P. Jaramillo</p>
+              <p class="text-xs text-slate-600">Universidad Nacional de Loja (UNL)</p>
+            </div>
+            <a href="mailto:ronald.p.jaramillo@unl.edu.ec" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-amber-300 text-amber-900 font-semibold text-xs sm:text-sm shadow-sm hover:bg-amber-100 transition">
+              <i class="fa-solid fa-envelope text-amber-600"></i>
+              <span>ronald.p.jaramillo@unl.edu.ec</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button onclick="goToScreen('screen-portada')" class="btn-glossy-purple px-7 py-2.5 rounded-full text-white font-game text-lg font-bold flex items-center gap-2">
+            <i class="fa-solid fa-arrow-left"></i> Volver
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- PANTALLA 3: MENÚ PRINCIPAL                                -->
+    <!-- ========================================================= -->
+    <section id="screen-menu" class="screen flex-col justify-between p-4 sm:p-6">
+      <div class="w-full max-w-5xl mx-auto flex items-center justify-between">
+        <div class="interactive bg-slate-900/80 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/25 text-white shadow-lg">
+          <h2 class="font-game text-xl sm:text-2xl font-bold text-cyan-300">Menú de Aprendizaje</h2>
+          <p class="text-xs text-slate-300">Selecciona una actividad para explorar al robot</p>
+        </div>
+        <button onclick="goToScreen('screen-portada')" class="interactive btn-glossy-orange px-5 py-2.5 rounded-full text-white font-game font-bold flex items-center gap-2">
+          <i class="fa-solid fa-house"></i> Portada
+        </button>
+      </div>
+
+      <!-- Panel Central / Lateral de Opciones del Diagrama -->
+      <div class="w-full max-w-5xl mx-auto my-auto flex justify-center md:justify-end">
+        <div class="interactive glass-card w-full max-w-md rounded-3xl p-5 sm:p-6 space-y-3 max-h-[82vh] overflow-y-auto custom-scroll">
+          <div class="text-center mb-2">
+            <span class="px-3 py-1 rounded-full bg-sky-100 text-sky-800 text-xs font-bold uppercase tracking-wider">CyberLab 7mo EGB</span>
+            <h3 class="font-game text-2xl font-bold text-slate-800 mt-1">¿Qué deseas explorar hoy?</h3>
+          </div>
+
+          <!-- Opción 1: Contenido (1 al 5) -->
+          <button onclick="openContenido(0)" class="w-full btn-glossy-cyan p-4 rounded-2xl text-white flex items-center justify-between group">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-white/25 flex items-center justify-center text-2xl">
+                <i class="fa-solid fa-book-open"></i>
+              </div>
+              <div class="text-left">
+                <div class="font-game text-xl font-bold">Contenido</div>
+                <div class="text-xs text-sky-100">5 Partes del Robot en 3D</div>
+              </div>
+            </div>
+            <i class="fa-solid fa-chevron-right text-xl group-hover:translate-x-1 transition-transform"></i>
+          </button>
+
+          <!-- Opción 2: Vídeo (2 minutos) -->
+          <div class="relative">
+            <button id="btn-menu-video" onclick="openVideo()" class="w-full btn-glossy-purple p-4 rounded-2xl text-white flex items-center justify-between group">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-white/25 flex items-center justify-center text-2xl">
+                  <i id="menu-video-icon" class="fa-solid fa-film"></i>
+                </div>
+                <div class="text-left">
+                  <div class="font-game text-xl font-bold">Vídeo</div>
+                  <div id="menu-video-sub" class="text-xs text-purple-100">Cápsula animada (2:00 min)</div>
+                </div>
+              </div>
+              <i id="menu-video-arrow" class="fa-solid fa-play text-xl group-hover:translate-x-1 transition-transform"></i>
+            </button>
+            <div id="menu-video-lock" class="lock-badge"><i class="fa-solid fa-lock"></i></div>
+          </div>
+
+          <!-- Opción 3: Actividad (relacionar partes) -->
+          <div class="relative">
+            <button id="btn-menu-actividad" onclick="openActividad()" class="w-full btn-glossy-orange p-4 rounded-2xl text-white flex items-center justify-between group">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-white/25 flex items-center justify-center text-2xl">
+                  <i id="menu-actividad-icon" class="fa-solid fa-puzzle-piece"></i>
+                </div>
+                <div class="text-left">
+                  <div class="font-game text-xl font-bold">Actividad</div>
+                  <div id="menu-actividad-sub" class="text-xs text-amber-100">Relaciona cada parte con su función</div>
+                </div>
+              </div>
+              <i id="menu-actividad-arrow" class="fa-solid fa-chevron-right text-xl group-hover:translate-x-1 transition-transform"></i>
+            </button>
+            <div id="menu-actividad-lock" class="lock-badge"><i class="fa-solid fa-lock"></i></div>
+          </div>
+
+          <!-- Opción 4: Evaluación Formativa (P1 a P5) -->
+          <div class="relative">
+            <button id="btn-menu-evaluacion" onclick="openEvaluacion()" class="w-full btn-glossy-green p-4 rounded-2xl text-white flex items-center justify-between group">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-white/25 flex items-center justify-center text-2xl">
+                  <i id="menu-evaluacion-icon" class="fa-solid fa-clipboard-check"></i>
+                </div>
+                <div class="text-left">
+                  <div class="font-game text-xl font-bold">Evaluación</div>
+                  <div id="menu-evaluacion-sub" class="text-xs text-emerald-100">5 Retos Interactivos (APE)</div>
+                </div>
+              </div>
+              <i id="menu-evaluacion-arrow" class="fa-solid fa-chevron-right text-xl group-hover:translate-x-1 transition-transform"></i>
+            </button>
+            <div id="menu-evaluacion-lock" class="lock-badge"><i class="fa-solid fa-lock"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="h-2"></div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- PANTALLA 4: CONTENIDOS 1 AL 5                             -->
+    <!-- ========================================================= -->
+    <section id="screen-contenido" class="screen flex-col justify-between p-4 sm:p-6">
+      <!-- Barra superior de navegación -->
+      <div class="w-full max-w-6xl mx-auto flex items-center justify-between gap-2">
+        <button onclick="goToScreen('screen-menu')" class="interactive btn-glossy-orange px-4 py-2 rounded-full text-white font-game font-bold text-sm sm:text-base flex items-center gap-2">
+          <i class="fa-solid fa-bars"></i> Menú
+        </button>
+
+        <!-- Indicador de pasos 1..5 -->
+        <div id="contenido-steps" class="interactive flex items-center gap-1.5 bg-slate-900/75 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/25"></div>
+
+        <button onclick="toggleExplode()" id="btn-contenido-explode" class="interactive px-4 py-2 rounded-full bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs sm:text-sm shadow-lg flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-cubes"></i> <span>Ver Despiece 3D</span>
+        </button>
+      </div>
+
+      <!-- Tarjeta Lateral del Contenido Activo (deja el robot visible a la izquierda) -->
+      <div class="w-full max-w-6xl mx-auto my-auto flex justify-center md:justify-end">
+        <div class="interactive glass-card w-full max-w-md rounded-3xl p-5 sm:p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <span id="contenido-badge" class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">Contenido 1 de 5</span>
+            <button onclick="speakCurrentContent()" class="w-9 h-9 rounded-full bg-sky-100 hover:bg-sky-200 text-sky-700 flex items-center justify-center transition" title="Escuchar explicación">
+              <i class="fa-solid fa-volume-high"></i>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div id="contenido-icon" class="w-12 h-12 rounded-2xl bg-sky-500 text-white flex items-center justify-center text-2xl shadow-md">
+              <i class="fa-solid fa-microchip"></i>
+            </div>
+            <div>
+              <h2 id="contenido-titulo" class="font-game text-2xl font-bold text-slate-800 leading-tight">Cerebro (CPU)</h2>
+              <p id="contenido-subtitulo" class="text-xs font-semibold text-sky-600">Microcontrolador Central</p>
+            </div>
+          </div>
+
+          <p id="contenido-descripcion" class="text-slate-700 text-sm sm:text-base leading-relaxed">
+            Es el centro de control del robot. Recibe información de los sensores, toma decisiones siguiendo un programa y envía órdenes a los motores.
+          </p>
+
+          <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs sm:text-sm text-amber-900">
+            <span class="font-bold"><i class="fa-solid fa-child-reaching mr-1 text-amber-600"></i> Analogía Humana:</span>
+            <span id="contenido-analogia">Funciona igual que nuestro cerebro cuando pensamos y decidimos mover una mano.</span>
+          </div>
+
+          <div class="bg-sky-50 border border-sky-200 rounded-2xl p-3 text-xs text-sky-900">
+            <span class="font-bold"><i class="fa-solid fa-lightbulb mr-1 text-sky-600"></i> Dato CyberLab:</span>
+            <span id="contenido-dato">Un microcontrolador puede ejecutar millones de instrucciones en un solo segundo.</span>
+          </div>
+
+          <!-- Flechas de Flujo Exactas del Diagrama -->
+          <div class="pt-2 flex items-center justify-between gap-3">
+            <button onclick="prevContenido()" class="btn-glossy-cyan px-5 py-2.5 rounded-full text-white font-game font-bold flex items-center gap-2 text-sm sm:text-base">
+              <i class="fa-solid fa-arrow-left"></i>
+              <span id="btn-prev-label">Menú</span>
+            </button>
+
+            <button onclick="nextContenido()" class="btn-glossy-green px-6 py-2.5 rounded-full text-white font-game font-bold flex items-center gap-2 text-sm sm:text-base">
+              <span id="btn-next-label">Siguiente</span>
+              <i id="btn-next-icon" class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="h-1"></div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- PANTALLA 5: VÍDEO EDUCATIVO DE 2 MINUTOS                  -->
+    <!-- ========================================================= -->
+    <section id="screen-video" class="screen flex-col justify-between p-4 sm:p-6">
+      <div class="w-full max-w-5xl mx-auto flex items-center justify-between">
+        <div class="interactive bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/25 text-white flex items-center gap-2.5">
+          <span class="w-3 h-3 rounded-full bg-rose-500 animate-pulse"></span>
+          <span class="font-game text-base sm:text-lg font-bold">Cápsula 3D: Anatomía del Robot (2:00)</span>
+        </div>
+
+        <button onclick="exitVideoScreen()" class="interactive btn-glossy-orange px-5 py-2 rounded-full text-white font-game font-bold flex items-center gap-2">
+          <i class="fa-solid fa-arrow-left"></i> VOLVER
+        </button>
+      </div>
+
+      <!-- Subtítulos y Reproductor Sincronizado con el Robot 3D -->
+      <div class="w-full max-w-4xl mx-auto mt-auto space-y-3">
+        <!-- Tarjeta de Subtítulo Educativo -->
+        <div class="interactive bg-slate-950/85 backdrop-blur-md border-2 border-cyan-400/70 rounded-2xl p-4 text-center shadow-2xl">
+          <span id="video-chapter-badge" class="inline-block px-3 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-bold mb-1">
+            Capítulo 1/5 • Introducción
+          </span>
+          <p id="video-subtitle" class="text-white text-base sm:text-xl font-medium leading-snug">
+            ¡Hola exploradores de 7mo Grado! Hoy descubriremos qué hay dentro de un robot inteligente.
+          </p>
+        </div>
+
+        <!-- Controles del Reproductor HTML5 (120 segundos) -->
+        <div class="interactive glass-card rounded-2xl p-3 sm:p-4 flex flex-col gap-2.5">
+          <!-- Barra de progreso interactiva -->
+          <div id="video-progress-bar" onclick="seekVideo(event)" class="w-full h-3 bg-slate-200 rounded-full overflow-hidden cursor-pointer relative">
+            <div id="video-progress-fill" class="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 rounded-full transition-all duration-150" style="width: 0%;"></div>
+          </div>
+
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <button onclick="toggleVideoPlay()" id="btn-video-play" class="btn-glossy-cyan w-11 h-11 rounded-full text-white flex items-center justify-center text-lg">
+                <i class="fa-solid fa-play"></i>
+              </button>
+              <button onclick="restartVideo()" class="w-9 h-9 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center justify-center transition" title="Reiniciar vídeo">
+                <i class="fa-solid fa-rotate-left"></i>
+              </button>
+              <button onclick="toggleVideoVoice()" id="btn-video-voice" class="px-3 py-1.5 rounded-full bg-purple-100 text-purple-800 font-bold text-xs flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-volume-high"></i> Voz: ON
+              </button>
+            </div>
+
+            <div class="font-mono font-bold text-slate-700 text-sm sm:text-base">
+              <span id="video-time-current">00:00</span> / <span>02:00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- PANTALLA 5B: ACTIVIDAD (RELACIONAR PARTES Y FUNCIONES)    -->
+    <!-- ========================================================= -->
+    <section id="screen-actividad" class="screen flex-col items-center justify-center p-4">
+      <div class="interactive glass-card w-full max-w-2xl rounded-3xl p-5 sm:p-7 max-h-[92vh] overflow-y-auto custom-scroll">
+
+        <div id="act-play-view">
+          <div class="flex items-center justify-between border-b-2 border-amber-100 pb-3 mb-4">
+            <span class="px-3.5 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-xs sm:text-sm">
+              <i class="fa-solid fa-puzzle-piece"></i> Actividad: Parte ↔ Función
+            </span>
+            <span id="act-progress-badge" class="px-3.5 py-1 rounded-full bg-sky-100 text-sky-800 font-bold text-xs sm:text-sm">Parejas: 0 / 5</span>
+          </div>
+
+          <p class="text-slate-600 text-sm mb-4">
+            Toca una <b>parte del robot</b> (izquierda) y luego la <b>función</b> que le corresponde (derecha).
+            ¡Completa las 5 parejas!
+          </p>
+
+          <div class="grid grid-cols-2 gap-3 sm:gap-5">
+            <div>
+              <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Partes</div>
+              <div id="act-left" class="space-y-2.5"></div>
+            </div>
+            <div>
+              <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Funciones</div>
+              <div id="act-right" class="space-y-2.5"></div>
+            </div>
+          </div>
+
+          <div id="act-hint" class="mt-4 text-center text-sm font-semibold text-slate-500 min-h-[1.25rem]"></div>
+
+          <div class="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
+            <button onclick="goToScreen('screen-menu')" class="text-slate-500 hover:text-slate-800 text-sm font-semibold flex items-center gap-1.5">
+              <i class="fa-solid fa-arrow-left"></i> Salir al Menú
+            </button>
+            <span id="act-errors-badge" class="text-xs font-bold text-rose-500">Intentos fallidos: 0</span>
+          </div>
+        </div>
+
+        <div id="act-result-view" class="hidden text-center space-y-4 py-2">
+          <div class="w-24 h-24 mx-auto rounded-full bg-emerald-100 border-4 border-emerald-400 flex items-center justify-center text-5xl shadow-lg">🎉</div>
+          <div>
+            <div id="act-stars" class="text-3xl mb-1"></div>
+            <h2 class="font-game text-2xl sm:text-3xl font-bold text-emerald-700">¡Actividad completada!</h2>
+            <p id="act-result-msg" class="text-slate-600 text-sm sm:text-base mt-2 max-w-md mx-auto"></p>
+          </div>
+          <div class="mx-auto max-w-md p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-start gap-2 text-left">
+            <i class="fa-solid fa-lock-open mt-0.5 text-emerald-600"></i>
+            <span>¡Muy bien! Ya se desbloqueó la <b>evaluación</b>. Es el último paso de la ruta.</span>
+          </div>
+          <div class="flex flex-wrap items-center justify-center gap-3 pt-1">
+            <button onclick="openEvaluacion()" class="btn-glossy-cyan px-6 py-3 rounded-full text-white font-game font-bold flex items-center gap-2">
+              <i class="fa-solid fa-clipboard-check"></i> Ir a la Evaluación
+            </button>
+            <button onclick="goToScreen('screen-menu')" class="btn-glossy-green px-6 py-3 rounded-full text-white font-game font-bold flex items-center gap-2">
+              <i class="fa-solid fa-house"></i> Volver al Menú
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- PANTALLA 6: EVALUACIÓN FORMATIVA (P1 A P5)                -->
+    <!-- ========================================================= -->
+    <section id="screen-evaluacion" class="screen flex-col items-center justify-center p-4">
+      <div class="interactive glass-card w-full max-w-2xl rounded-3xl p-6 sm:p-8 max-h-[92vh] overflow-y-auto custom-scroll">
+        <!-- Encabezado de Pregunta -->
+        <div id="eval-question-view">
+          <div class="flex items-center justify-between border-b-2 border-emerald-100 pb-3 mb-5">
+            <span id="eval-progress-badge" class="px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs sm:text-sm">
+              Pregunta P1 de P5
+            </span>
+            <span id="eval-score-badge" class="px-3.5 py-1 rounded-full bg-sky-100 text-sky-800 font-bold text-xs sm:text-sm">
+              Aciertos: 0
+            </span>
+          </div>
+
+          <h2 id="eval-question-text" class="font-game text-xl sm:text-2xl font-bold text-slate-800 mb-5 leading-snug">
+            ¿Qué componente actúa como el "cerebro" del robot procesando la información y tomando decisiones?
+          </h2>
+
+          <!-- 3 Opciones (OP1, OP2, OP3) -->
+          <div id="eval-options-container" class="space-y-3"></div>
+
+          <!-- Retroalimentación Inmediata (R Positiva / R Negativa) -->
+          <div id="eval-feedback-box" class="hidden mt-5 p-4 rounded-2xl border-2">
+            <div class="flex items-center gap-3 mb-2">
+              <div id="eval-feedback-emoji" class="text-4xl">😊</div>
+              <div>
+                <h3 id="eval-feedback-title" class="font-game text-lg font-bold">¡Respuesta Correcta!</h3>
+                <p id="eval-feedback-text" class="text-sm text-slate-700"></p>
+              </div>
+            </div>
+            <div class="mt-3 flex justify-end">
+              <button onclick="nextQuestion()" class="btn-glossy-cyan px-6 py-2 rounded-full text-white font-game font-bold flex items-center gap-2">
+                <span>Siguiente</span> <i class="fa-solid fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Pantalla Final de Resultados Diferenciada (< 3 vs >= 3) -->
+        <div id="eval-result-view" class="hidden text-center space-y-5 py-2">
+          <div id="result-icon-badge" class="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-5xl shadow-lg">
+            🏆
+          </div>
+
+          <div>
+            <span id="result-score-pill" class="inline-block px-4 py-1 rounded-full font-bold text-sm mb-2">
+              Puntaje Final: 5 / 5
+            </span>
+            <h2 id="result-title" class="font-game text-2xl sm:text-3xl font-bold text-slate-800">
+              ¡Excelente Trabajo! Evaluación Superada
+            </h2>
+            <p id="result-message" class="text-slate-600 text-sm sm:text-base mt-2 max-w-md mx-auto">
+              Has demostrado un gran dominio sobre la anatomía del robot y sus componentes principales.
+            </p>
+          </div>
+
+          <div id="result-actions" class="flex flex-wrap items-center justify-center gap-3 pt-2"></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <div id="toast-lock" class="glass-card rounded-2xl px-5 py-3 text-slate-700 font-semibold text-sm flex items-center gap-3">
+    <i class="fa-solid fa-lock text-amber-500 text-lg"></i><span id="toast-lock-text"></span>
+  </div>
+
+  <script>
+    // =========================================================================
+    // DATOS PEDAGÓGICOS (CONTENIDOS 1-5, VÍDEO 2 MIN Y EVALUACIÓN P1-P5)
+    // =========================================================================
+    const CONTENIDOS = [
+      {
+        id: 1,
+        titulo: "Cerebro (CPU)",
+        subtitulo: "Microcontrolador Central",
+        icon: "fa-microchip",
+        color: "bg-sky-500",
+        descripcion: "Es el centro de control del robot. Recibe señales eléctricas de todos los sensores, ejecuta el programa guardado en su memoria y envía órdenes precisas a cada motor.",
+        analogia: "Funciona igual que nuestro cerebro cuando piensa, analiza lo que ve y decide mover un brazo.",
+        dato: "Un microcontrolador escolar como Arduino o ESP32 realiza millones de operaciones por segundo.",
+        focusPart: "cpu",
+        camPos: { x: 0, y: 2.25, z: 3.1 },
+        lookAt: { x: 0, y: 2.15, z: 0 }
+      },
+      {
+        id: 2,
+        titulo: "Sentidos (Sensores)",
+        subtitulo: "Sensores Ultrasónicos e Infrarrojos",
+        icon: "fa-satellite-dish",
+        color: "bg-cyan-500",
+        descripcion: "Permiten al robot percibir el mundo exterior: medir distancias con ondas de sonido (ultrasonido), detectar luz, colores, temperatura o contacto físico.",
+        analogia: "Son como los ojos, oídos y el tacto de los seres humanos.",
+        dato: "Los sensores ultrasónicos imitan la ecolocalización de los murciélagos y delfines.",
+        focusPart: "sensors",
+        camPos: { x: 0.9, y: 2.1, z: 3.2 },
+        lookAt: { x: 0, y: 1.95, z: 0.3 }
+      },
+      {
+        id: 3,
+        titulo: "Músculos (Servomotores)",
+        subtitulo: "Actuadores y Engranajes",
+        icon: "fa-gears",
+        color: "bg-amber-500",
+        descripcion: "Transforman la energía eléctrica en movimiento mecánico. Gracias a sus engranajes internos, permiten girar ruedas, mover brazos y articular pinzas con exactitud.",
+        analogia: "Equivalen a nuestros músculos y articulaciones que nos permiten caminar y sujetar objetos.",
+        dato: "Los servomotores pueden girar a un ángulo exacto (por ejemplo, 90° o 180°) según la orden de la CPU.",
+        focusPart: "servos",
+        camPos: { x: 1.9, y: 1.45, z: 3.2 },
+        lookAt: { x: 0.5, y: 1.15, z: 0 }
+      },
+      {
+        id: 4,
+        titulo: "Esqueleto (Chasis)",
+        subtitulo: "Estructura y Carcasa Protectora",
+        icon: "fa-shield-halved",
+        color: "bg-rose-500",
+        descripcion: "Es el armazón físico que sostiene y protege los circuitos delicados, cables y motores contra golpes, polvo y vibraciones durante el movimiento.",
+        analogia: "Es como el esqueleto humano (cráneo y costillas) que sostiene el cuerpo y protege los órganos vitales.",
+        dato: "Se fabrica con materiales ligeros y resistentes como plástico ABS, acrílico, aluminio o impresión 3D.",
+        focusPart: "chassis",
+        camPos: { x: -1.6, y: 1.4, z: 3.8 },
+        lookAt: { x: 0, y: 1.15, z: 0 }
+      },
+      {
+        id: 5,
+        titulo: "Energía (Batería LiPo)",
+        subtitulo: "Sistema de Alimentación Eléctrica",
+        icon: "fa-battery-full",
+        color: "bg-emerald-500",
+        descripcion: "Almacena la energía química y la convierte en electricidad continua para encender el microcontrolador, los sensores y dar fuerza a todos los motores.",
+        analogia: "Funciona como los alimentos y el sistema digestivo que nos dan energía para estudiar y jugar.",
+        dato: "Las baterías de Polímero de Litio (LiPo) son recargables, muy ligeras y entregan gran potencia.",
+        focusPart: "battery",
+        camPos: { x: -1.8, y: 1.35, z: -3.2 },
+        lookAt: { x: 0, y: 1.1, z: -0.3 }
+      }
+    ];
+
+    // Guion de 120 segundos (2 minutos) para el Vídeo Interactivo 3D
+    const VIDEO_CHAPTERS = [
+      {
+        start: 0,
+        end: 24,
+        badge: "Capítulo 1/5 • Bienvenida (0:00 - 0:24)",
+        text: "¡Hola estudiantes de 7mo Grado! Bienvenidos a CyberLab. Un robot es una máquina inteligente compuesta por cinco sistemas que trabajan en equipo.",
+        explode: false,
+        camPos: { x: 0, y: 1.45, z: 4.5 },
+        lookAt: { x: 0, y: 1.15, z: 0 }
+      },
+      {
+        start: 24,
+        end: 48,
+        badge: "Capítulo 2/5 • El Cerebro CPU (0:24 - 0:48)",
+        text: "En su cabeza encontramos el microcontrolador o CPU. Es su cerebro electrónico: lee datos y decide qué acción realizar en cada instante.",
+        explode: true,
+        camPos: { x: 0.4, y: 2.3, z: 3.0 },
+        lookAt: { x: 0, y: 2.15, z: 0 }
+      },
+      {
+        start: 48,
+        end: 72,
+        badge: "Capítulo 3/5 • Los Sensores (0:48 - 1:12)",
+        text: "En su visera están los sensores ultrasónicos y ópticos. Funcionan como sus ojos y oídos para medir distancias y esquivar obstáculos sin chocar.",
+        explode: true,
+        camPos: { x: -0.9, y: 2.05, z: 3.1 },
+        lookAt: { x: 0, y: 1.95, z: 0.3 }
+      },
+      {
+        start: 72,
+        end: 96,
+        badge: "Capítulo 4/5 • Servomotores y Chasis (1:12 - 1:36)",
+        text: "Sus extremidades se mueven gracias a servomotores con engranajes internos, mientras el chasis protege toda la electrónica como un esqueleto.",
+        explode: true,
+        camPos: { x: 2.0, y: 1.4, z: 3.2 },
+        lookAt: { x: 0.4, y: 1.15, z: 0 }
+      },
+      {
+        start: 96,
+        end: 120,
+        badge: "Capítulo 5/5 • Batería y Resumen (1:36 - 2:00)",
+        text: "Finalmente, en su espalda lleva la batería LiPo que brinda energía a todo el sistema. ¡Ahora estás listo para superar la evaluación formativa!",
+        explode: true,
+        camPos: { x: -1.9, y: 1.35, z: -3.2 },
+        lookAt: { x: 0, y: 1.1, z: -0.3 }
+      }
+    ];
+
+    // Banco de 5 Preguntas de Evaluación Formativa (P1 a P5)
+    const PREGUNTAS = [
+      {
+        codigo: "P1",
+        pregunta: "¿Qué componente electrónico funciona como el 'cerebro' del robot, procesando la información y enviando órdenes?",
+        opciones: [
+          "OP1: El Microcontrolador (CPU)",
+          "OP2: La carcasa plástica o chasis",
+          "OP3: Los cables de alimentación"
+        ],
+        correcta: 0,
+        explicacion: "El Microcontrolador (CPU) ejecuta las instrucciones del programa y coordina todos los sensores y motores del robot."
+      },
+      {
+        codigo: "P2",
+        pregunta: "Si un robot necesita detectar una pared delante de él para no chocar, ¿qué parte de su anatomía utiliza?",
+        opciones: [
+          "OP1: La batería LiPo trasera",
+          "OP2: Los sensores ultrasónicos",
+          "OP3: Los tornillos del soporte"
+        ],
+        correcta: 1,
+        explicacion: "Los sensores ultrasónicos emiten ondas de sonido imperceptibles que rebotan en los objetos para calcular su distancia."
+      },
+      {
+        codigo: "P3",
+        pregunta: "¿Cuál es la función principal de los servomotores en los brazos y articulaciones del robot?",
+        opciones: [
+          "OP1: Almacenar energía eléctrica recargable",
+          "OP2: Decorar el exterior del robot",
+          "OP3: Transformar la electricidad en movimiento preciso"
+        ],
+        correcta: 2,
+        explicacion: "Los servomotores actúan como los músculos del robot, convirtiendo la energía eléctrica en movimiento controlado mediante engranajes."
+      },
+      {
+        codigo: "P4",
+        pregunta: "¿Con qué parte del cuerpo humano comparamos el chasis o estructura externa del robot?",
+        opciones: [
+          "OP1: Con el esqueleto que sostiene y protege los órganos",
+          "OP2: Con los ojos y los oídos",
+          "OP3: Con los alimentos que nos dan energía"
+        ],
+        correcta: 0,
+        explicacion: "El chasis brinda soporte mecánico y protege los circuitos internos delicados, igual que el esqueleto en el cuerpo humano."
+      },
+      {
+        codigo: "P5",
+        pregunta: "¿De dónde obtiene el robot la energía eléctrica necesaria para encender su CPU y mover sus motores?",
+        opciones: [
+          "OP1: Del sensor de distancia",
+          "OP2: De la batería recargable (LiPo)",
+          "OP3: De las ruedas o botas"
+        ],
+        correcta: 1,
+        explicacion: "La batería LiPo almacena energía y suministra voltaje continuo a todos los circuitos y actuadores del robot."
+      }
+    ];
+
+    // Pares de la Actividad (parte ↔ función). El índice coincide con CONTENIDOS.
+    const ACTIVIDAD_FUNCIONES = [
+      "Procesa la información y toma decisiones",
+      "Detectan distancias, luz y obstáculos",
+      "Convierten la electricidad en movimiento",
+      "Sostiene y protege los circuitos",
+      "Almacena y entrega energía eléctrica"
+    ];
+
+    // =========================================================================
+    // ESTADO DE LA APLICACIÓN Y AUDIO SINTÉTICO (WEB AUDIO & SPEECH API)
+    // =========================================================================
+    let currentScreen = 'screen-portada';
+    let currentContenidoIdx = 0;
+    let isExploded = false;
+
+    // Estado del vídeo de 2 minutos (120 s)
+    let videoSeconds = 0;
+    let isVideoPlaying = false;
+    let videoVoiceEnabled = true;
+    let videoTimerInterval = null;
+    let lastSpokenChapter = -1;
+
+    // Estado de evaluación
+    // Actividad: bloqueo tras completarla hasta repasar los 5 contenidos
+    // Ruta: Contenidos y Vídeo libres -> (5 contenidos vistos) Actividad -> Evaluación
+    const BLOQUEOS = {
+      video:      { bloqueada: false, nombre: 'El vídeo',     req: '' },
+      actividad:  { bloqueada: true, nombre: 'La actividad',  req: 'Revisa los 5 contenidos' },
+      evaluacion: { bloqueada: true, nombre: 'La evaluación', req: 'Completa la actividad' }
+    };
+    const contenidosVistos = new Set();
+    // Evaluación sumativa: 5/5 la cierra para siempre; menos de 3 la bloquea hasta repasar
+    let evalPerfecta = false;          // true cuando obtuvo 5/5 (ya no puede repetirla)
+    let evalRequiereRepaso = false;    // true tras sacar menos de 3
+    let repasoPostEval = new Set();    // contenidos vistos de nuevo tras reprobar
+    let videoMaxSeconds = 0;
+    let actMatched = new Set();
+    let actSelectedLeft = null;
+    let actSelectedRight = null;
+    let actErrors = 0;
+    let actBusy = false;
+    let toastTimer = null;
+
+    let currentQuestionIdx = 0;
+    let quizScore = 0;
+    let questionAnswered = false;
+
+    function playSound(type) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        const now = ctx.currentTime;
+        if (type === 'click') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(780, now + 0.08);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+          osc.start(now);
+          osc.stop(now + 0.09);
+        } else if (type === 'success') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(523.25, now);
+          osc.frequency.setValueAtTime(659.25, now + 0.1);
+          osc.frequency.setValueAtTime(783.99, now + 0.2);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc.start(now);
+          osc.stop(now + 0.35);
+        } else if (type === 'error') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(240, now);
+          osc.frequency.linearRampToValueAtTime(170, now + 0.25);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+          osc.start(now);
+          osc.stop(now + 0.26);
+        }
+      } catch (e) {
+        // Silenciar si el navegador bloquea audio antes de interacción
+      }
+    }
+
+    function speakText(text) {
+      try {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'es-ES';
+        utter.rate = 1.02;
+        utter.pitch = 1.08;
+        window.speechSynthesis.speak(utter);
+      } catch (e) {
+        // Ignorar si no está disponible
+      }
+    }
+
+    function stopSpeech() {
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+      } catch (e) {}
+    }
+
+    // =========================================================================
+    // NAVEGACIÓN ENTRE PANTALLAS (SEGÚN DIAGRAMAS DE FLUJO)
+    // =========================================================================
+    function goToScreen(screenId) {
+      playSound('click');
+      stopSpeech();
+      if (screenId !== 'screen-video') {
+        pauseVideo();
+      }
+
+      document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+      const target = document.getElementById(screenId);
+      if (target) target.classList.add('active');
+      currentScreen = screenId;
+
+      if (screenId === 'screen-portada') {
+        setExplodedState(false);
+        focusCameraOn({ x: 0, y: 1.38, z: 4.65 }, { x: 0, y: 1.15, z: 0 });
+      } else if (screenId === 'screen-menu') {
+        setExplodedState(false);
+        focusCameraOn({ x: 1.6, y: 1.45, z: 4.6 }, { x: 1.05, y: 1.15, z: 0 });
+        updateActividadMenu();
+      } else if (screenId === 'screen-actividad') {
+        setExplodedState(false);
+        focusCameraOn({ x: 1.6, y: 1.45, z: 4.6 }, { x: 1.05, y: 1.15, z: 0 });
+      } else if (screenId === 'screen-video') {
+        restartVideo();
+        playVideo();
+      }
+    }
+
+    // =========================================================================
+    // LÓGICA DE CONTENIDOS 1 AL 5
+    // =========================================================================
+    function openContenido(index) {
+      currentContenidoIdx = Math.max(0, Math.min(CONTENIDOS.length - 1, index));
+      goToScreen('screen-contenido');
+      renderContenido();
+    }
+
+    function renderContenido() {
+      const item = CONTENIDOS[currentContenidoIdx];
+      registrarRepaso(currentContenidoIdx);
+      document.getElementById('contenido-badge').textContent = `Contenido ${item.id} de ${CONTENIDOS.length}`;
+      document.getElementById('contenido-titulo').textContent = item.titulo;
+      document.getElementById('contenido-subtitulo').textContent = item.subtitulo;
+      document.getElementById('contenido-descripcion').textContent = item.descripcion;
+      document.getElementById('contenido-analogia').textContent = item.analogia;
+      document.getElementById('contenido-dato').textContent = item.dato;
+
+      const iconBox = document.getElementById('contenido-icon');
+      iconBox.className = `w-12 h-12 rounded-2xl ${item.color} text-white flex items-center justify-center text-2xl shadow-md`;
+      iconBox.innerHTML = `<i class="fa-solid ${item.icon}"></i>`;
+
+      // Puntos indicadores 1..5
+      const stepsContainer = document.getElementById('contenido-steps');
+      stepsContainer.innerHTML = CONTENIDOS.map((c, idx) => `
+        <button onclick="openContenido(${idx})" class="w-7 h-7 rounded-full text-xs font-bold transition ${idx === currentContenidoIdx ? 'bg-cyan-400 text-slate-950 scale-110' : 'bg-white/20 text-white hover:bg-white/35'}">
+          ${c.id}
+        </button>
+      `).join('');
+
+      // Etiquetas de flechas según el diagrama (Contenido 1 vuelve a Menú, Contenido 5 Finaliza)
+      document.getElementById('btn-prev-label').textContent = currentContenidoIdx === 0 ? 'Menú' : 'Anterior';
+      const isLast = currentContenidoIdx === CONTENIDOS.length - 1;
+      document.getElementById('btn-next-label').textContent = isLast ? 'Finalizar' : 'Siguiente';
+      document.getElementById('btn-next-icon').className = isLast ? 'fa-solid fa-check' : 'fa-solid fa-arrow-right';
+
+      // Activar despiece para apreciar la parte interna y enfocar cámara
+      setExplodedState(true);
+      const v = shiftViewForPanel(item.camPos, item.lookAt);
+      focusCameraOn(v.pos, v.look);
+      const lblNum = document.getElementById('part-label-num');
+      lblNum.className = `pl-num ${item.color}`;
+      lblNum.textContent = item.id;
+      document.getElementById('part-label-text').textContent = item.titulo;
+    }
+
+    // Desplaza la vista para que el robot quede libre del panel de contenido
+    // (a la izquierda en pantallas anchas; arriba en pantallas angostas).
+    function shiftViewForPanel(pos, look) {
+      if (typeof THREE === 'undefined') return { pos, look };
+      const P = new THREE.Vector3(pos.x, pos.y, pos.z);
+      const L = new THREE.Vector3(look.x, look.y, look.z);
+      const fwd = L.clone().sub(P);
+      const dist = fwd.length();
+      fwd.normalize();
+      const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+      const halfH = dist * Math.tan(THREE.MathUtils.degToRad(22));
+      const aspect = window.innerWidth / window.innerHeight;
+      const offset = new THREE.Vector3();
+      if (window.innerWidth >= 768) {
+        offset.copy(right).multiplyScalar(0.40 * halfH * aspect);
+      } else {
+        offset.set(0, -0.30 * halfH, 0);
+      }
+      return { pos: P.add(offset), look: L.add(offset) };
+    }
+
+    function getPartAnchor(part) {
+      const v = new THREE.Vector3();
+      switch (part) {
+        case 'cpu': cpuGroup.getWorldPosition(v); break;
+        case 'sensors': sensorsGroup.getWorldPosition(v); break;
+        case 'servos': armRightGroup.getWorldPosition(v); break;
+        case 'chassis': torsoGroup.localToWorld(v.set(0.30, 0.12, 0.28)); break;
+        case 'battery': batteryGroup.getWorldPosition(v); break;
+        default: return null;
+      }
+      return v;
+    }
+
+    function updatePartLabel() {
+      const el = document.getElementById('part-label');
+      if (!el) return;
+      if (currentScreen !== 'screen-contenido' || !camera || !torsoGroup) {
+        el.classList.remove('visible');
+        return;
+      }
+      const a = getPartAnchor(CONTENIDOS[currentContenidoIdx].focusPart);
+      if (!a) { el.classList.remove('visible'); return; }
+      a.project(camera);
+      if (a.z > 1) { el.classList.remove('visible'); return; }
+      const x = (a.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-a.y * 0.5 + 0.5) * window.innerHeight;
+      el.style.transform = `translate(calc(${x}px - 100% + 7px), calc(${y}px - 50%))`;
+      el.classList.add('visible');
+    }
+
+    function prevContenido() {
+      if (currentContenidoIdx === 0) {
+        goToScreen('screen-menu');
+      } else {
+        openContenido(currentContenidoIdx - 1);
+      }
+    }
+
+    function nextContenido() {
+      if (currentContenidoIdx === CONTENIDOS.length - 1) {
+        goToScreen('screen-menu');
+      } else {
+        openContenido(currentContenidoIdx + 1);
+      }
+    }
+
+    function speakCurrentContent() {
+      const item = CONTENIDOS[currentContenidoIdx];
+      speakText(`${item.titulo}. ${item.descripcion} ${item.analogia}`);
+    }
+
+    // =========================================================================
+    // LÓGICA DEL VÍDEO EDUCATIVO DE 2 MINUTOS (120 SEGUNDOS)
+    // =========================================================================
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updateVideoUI() {
+      document.getElementById('video-time-current').textContent = formatTime(videoSeconds);
+      const pct = Math.min(100, (videoSeconds / 120) * 100);
+      document.getElementById('video-progress-fill').style.width = `${pct}%`;
+
+      const chIdx = VIDEO_CHAPTERS.findIndex(c => videoSeconds >= c.start && videoSeconds < c.end);
+      const activeIdx = chIdx === -1 ? VIDEO_CHAPTERS.length - 1 : chIdx;
+      const chapter = VIDEO_CHAPTERS[activeIdx];
+
+      document.getElementById('video-chapter-badge').textContent = chapter.badge;
+      document.getElementById('video-subtitle').textContent = chapter.text;
+
+      if (activeIdx !== lastSpokenChapter) {
+        lastSpokenChapter = activeIdx;
+        setExplodedState(chapter.explode);
+        focusCameraOn(chapter.camPos, chapter.lookAt);
+        if (isVideoPlaying && videoVoiceEnabled) {
+          speakText(chapter.text);
+        }
+      }
+    }
+
+    function playVideo() {
+      if (isVideoPlaying) return;
+      isVideoPlaying = true;
+      document.getElementById('btn-video-play').innerHTML = '<i class="fa-solid fa-pause"></i>';
+
+      const chIdx = VIDEO_CHAPTERS.findIndex(c => videoSeconds >= c.start && videoSeconds < c.end);
+      const activeIdx = chIdx === -1 ? 0 : chIdx;
+      if (videoVoiceEnabled) {
+        speakText(VIDEO_CHAPTERS[activeIdx].text);
+      }
+
+      videoTimerInterval = setInterval(() => {
+        videoSeconds += 0.25;
+        videoMaxSeconds = Math.max(videoMaxSeconds, videoSeconds);
+        if (videoSeconds >= 120) {
+          videoSeconds = 120;
+          updateVideoUI();
+          pauseVideo();
+          if (evalRequiereRepaso && BLOQUEOS.evaluacion.bloqueada) {
+            evalRequiereRepaso = false;
+            desbloquear('evaluacion', '¡Vídeo completo! La evaluación se desbloqueó de nuevo 🔓');
+          }
+          return;
+        }
+        updateVideoUI();
+      }, 250);
+    }
+
+    function pauseVideo() {
+      isVideoPlaying = false;
+      const btn = document.getElementById('btn-video-play');
+      if (btn) btn.innerHTML = '<i class="fa-solid fa-play"></i>';
+      if (videoTimerInterval) {
+        clearInterval(videoTimerInterval);
+        videoTimerInterval = null;
+      }
+      stopSpeech();
+    }
+
+    function toggleVideoPlay() {
+      playSound('click');
+      if (isVideoPlaying) {
+        pauseVideo();
+      } else {
+        if (videoSeconds >= 120) videoSeconds = 0;
+        playVideo();
+      }
+    }
+
+    function restartVideo() {
+      pauseVideo();
+      videoSeconds = 0;
+      lastSpokenChapter = -1;
+      updateVideoUI();
+    }
+
+    function seekVideo(e) {
+      const bar = document.getElementById('video-progress-bar');
+      const rect = bar.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      videoSeconds = Math.floor(ratio * 120);
+      lastSpokenChapter = -1;
+      updateVideoUI();
+    }
+
+    function toggleVideoVoice() {
+      videoVoiceEnabled = !videoVoiceEnabled;
+      const btn = document.getElementById('btn-video-voice');
+      btn.innerHTML = `<i class="fa-solid ${videoVoiceEnabled ? 'fa-volume-high' : 'fa-volume-xmark'}"></i> Voz: ${videoVoiceEnabled ? 'ON' : 'OFF'}`;
+      if (!videoVoiceEnabled) stopSpeech();
+    }
+
+    function exitVideoScreen() {
+      pauseVideo();
+      goToScreen('screen-menu');
+    }
+
+    // =========================================================================
+    // LÓGICA DE LA ACTIVIDAD (RELACIONAR PARTES Y FUNCIONES) + BLOQUEO
+    // =========================================================================
+    function showToast(msg) {
+      const t = document.getElementById('toast-lock');
+      document.getElementById('toast-lock-text').textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), 3800);
+    }
+
+    const MENU_TEXTO = {
+      video:      { icon: 'fa-solid fa-film',            arrow: 'fa-solid fa-play text-xl group-hover:translate-x-1 transition-transform', normal: 'Cápsula animada (2:00 min)' },
+      actividad:  { icon: 'fa-solid fa-puzzle-piece',    arrow: 'fa-solid fa-chevron-right text-xl group-hover:translate-x-1 transition-transform', normal: 'Relaciona cada parte con su función' },
+      evaluacion: { icon: 'fa-solid fa-clipboard-check', arrow: 'fa-solid fa-chevron-right text-xl group-hover:translate-x-1 transition-transform', normal: '5 Retos Interactivos (APE)' }
+    };
+
+    function textoRequisito(k) {
+      if (k === 'evaluacion' && evalRequiereRepaso) return 'Bloqueada: repasa los 5 contenidos o mira el vídeo completo';
+      if (k === 'actividad') return `Bloqueada: revisa los 5 contenidos (${contenidosVistos.size}/${CONTENIDOS.length})`;
+      return 'Bloqueada: completa la actividad';
+    }
+
+    function updateActividadMenu() {
+      Object.keys(BLOQUEOS).forEach(k => {
+        const b = BLOQUEOS[k];
+        const btn = document.getElementById('btn-menu-' + k);
+        if (!btn) return;
+        const sub = document.getElementById('menu-' + k + '-sub');
+        const icon = document.getElementById('menu-' + k + '-icon');
+        const arrow = document.getElementById('menu-' + k + '-arrow');
+        const lock = document.getElementById('menu-' + k + '-lock');
+        if (k === 'evaluacion' && evalPerfecta) {
+          btn.classList.remove('btn-locked');
+          lock.classList.remove('on');
+          icon.className = quizScore === PREGUNTAS.length ? 'fa-solid fa-trophy' : 'fa-solid fa-circle-check';
+          arrow.className = 'fa-solid fa-circle-check text-xl';
+          sub.textContent = `¡Completada con ${quizScore}/${PREGUNTAS.length}! Ver mi resultado`;
+        } else if (b.bloqueada) {
+          btn.classList.add('btn-locked');
+          lock.classList.add('on');
+          icon.className = 'fa-solid fa-lock';
+          arrow.className = 'fa-solid fa-lock text-xl';
+          sub.textContent = textoRequisito(k);
+        } else {
+          btn.classList.remove('btn-locked');
+          lock.classList.remove('on');
+          icon.className = MENU_TEXTO[k].icon;
+          arrow.className = MENU_TEXTO[k].arrow;
+          sub.textContent = MENU_TEXTO[k].normal;
+        }
+      });
+    }
+
+    function desbloquear(k, mensaje) {
+      if (!BLOQUEOS[k].bloqueada) return;
+      BLOQUEOS[k].bloqueada = false;
+      playSound('success');
+      showToast(mensaje);
+      updateActividadMenu();
+    }
+
+    // Se llama cada vez que el estudiante ve un contenido
+    function registrarRepaso(idx) {
+      contenidosVistos.add(idx);
+      if (evalRequiereRepaso && BLOQUEOS.evaluacion.bloqueada) {
+        repasoPostEval.add(idx);
+        if (repasoPostEval.size >= CONTENIDOS.length) {
+          evalRequiereRepaso = false;
+          desbloquear('evaluacion', '¡Repaso completo! La evaluación se desbloqueó de nuevo 🔓');
+        }
+      }
+      if (contenidosVistos.size >= CONTENIDOS.length) {
+        desbloquear('actividad', '¡Contenidos completados! La actividad se desbloqueó 🔓');
+      }
+    }
+
+    function avisoBloqueo(k) {
+      const b = BLOQUEOS[k];
+      playSound('error');
+      if (k === 'evaluacion' && evalRequiereRepaso) {
+        showToast(`Para volver a la evaluación, repasa los 5 contenidos (${repasoPostEval.size}/${CONTENIDOS.length}) o mira el vídeo completo.`);
+        return;
+      }
+      const extra = k === 'actividad' ? ` (${contenidosVistos.size}/${CONTENIDOS.length})` : '';
+      showToast(`${b.nombre} está bloqueado/a. ${b.req}${extra}.`);
+    }
+
+    function openVideo() {
+      if (BLOQUEOS.video.bloqueada) { avisoBloqueo('video'); return; }
+      goToScreen('screen-video');
+    }
+
+    function openActividad() {
+      if (BLOQUEOS.actividad.bloqueada) { avisoBloqueo('actividad'); return; }
+      startActividad();
+    }
+
+    function openEvaluacion() {
+      if (evalPerfecta) {            // Ya la aprobó con 5/5: solo puede ver su retroalimentación
+        goToScreen('screen-evaluacion');
+        showFinalResults(true);
+        return;
+      }
+      if (BLOQUEOS.evaluacion.bloqueada) { avisoBloqueo('evaluacion'); return; }
+      startEvaluacion();
+    }
+
+    function shuffleArray(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function startActividad() {
+      actMatched = new Set();
+      actSelectedLeft = null;
+      actSelectedRight = null;
+      actErrors = 0;
+      actBusy = false;
+      goToScreen('screen-actividad');
+      document.getElementById('act-play-view').classList.remove('hidden');
+      document.getElementById('act-result-view').classList.add('hidden');
+
+      const left = document.getElementById('act-left');
+      left.innerHTML = shuffleArray(CONTENIDOS.map((c, i) => i)).map(i => { const c = CONTENIDOS[i]; return `
+        <button id="act-l-${i}" onclick="actPick('L', ${i})" class="act-item">
+          <span class="w-8 h-8 shrink-0 rounded-lg ${c.color} text-white flex items-center justify-center"><i class="fa-solid ${c.icon}"></i></span>
+          <span>${c.titulo}</span>
+        </button>`; }).join('');
+
+      const right = document.getElementById('act-right');
+      right.innerHTML = shuffleArray(ACTIVIDAD_FUNCIONES.map((t, i) => i)).map(i => `
+        <button id="act-r-${i}" onclick="actPick('R', ${i})" class="act-item">
+          <span>${ACTIVIDAD_FUNCIONES[i]}</span>
+        </button>`).join('');
+
+      updateActUI('Elige una parte del robot para empezar.');
+    }
+
+    function updateActUI(hint) {
+      document.getElementById('act-progress-badge').textContent = `Parejas: ${actMatched.size} / ${CONTENIDOS.length}`;
+      document.getElementById('act-errors-badge').textContent = `Intentos fallidos: ${actErrors}`;
+      if (hint !== undefined) document.getElementById('act-hint').textContent = hint;
+    }
+
+    function actPick(side, idx) {
+      if (actBusy || actMatched.has(idx)) return;
+      playSound('click');
+      if (side === 'L') {
+        if (actSelectedLeft !== null) document.getElementById('act-l-' + actSelectedLeft).classList.remove('selected');
+        actSelectedLeft = idx;
+        document.getElementById('act-l-' + idx).classList.add('selected');
+      } else {
+        if (actSelectedRight !== null) document.getElementById('act-r-' + actSelectedRight).classList.remove('selected');
+        actSelectedRight = idx;
+        document.getElementById('act-r-' + idx).classList.add('selected');
+      }
+
+      if (actSelectedLeft === null) { updateActUI('Ahora elige la parte del robot.'); return; }
+      if (actSelectedRight === null) { updateActUI('Ahora elige la función que le corresponde.'); return; }
+
+      const l = document.getElementById('act-l-' + actSelectedLeft);
+      const r = document.getElementById('act-r-' + actSelectedRight);
+      if (actSelectedLeft === actSelectedRight) {
+        const k = actSelectedLeft;
+        [l, r].forEach(el => { el.classList.remove('selected'); el.classList.add('matched'); el.disabled = true; });
+        r.insertAdjacentHTML('beforeend', '<i class="fa-solid fa-circle-check ml-auto text-emerald-600"></i>');
+        actMatched.add(k);
+        actSelectedLeft = null; actSelectedRight = null;
+        playSound('success');
+        updateActUI('¡Correcto! 🎯');
+        if (actMatched.size === CONTENIDOS.length) setTimeout(finishActividad, 700);
+      } else {
+        actErrors++;
+        actBusy = true;
+        [l, r].forEach(el => { el.classList.remove('selected'); el.classList.add('wrong'); });
+        playSound('error');
+        updateActUI('Esa pareja no es correcta. ¡Inténtalo de nuevo!');
+        setTimeout(() => {
+          [l, r].forEach(el => el.classList.remove('wrong'));
+          actSelectedLeft = null; actSelectedRight = null;
+          actBusy = false;
+        }, 450);
+      }
+    }
+
+    function finishActividad() {
+      const stars = actErrors <= 1 ? 3 : (actErrors <= 3 ? 2 : 1);
+      document.getElementById('act-stars').innerHTML =
+        '<span class="text-amber-400">' + '★'.repeat(stars) + '</span><span class="text-slate-300">' + '★'.repeat(3 - stars) + '</span>';
+      document.getElementById('act-result-msg').textContent =
+        actErrors === 0
+          ? 'Relacionaste las 5 partes sin ningún error. ¡Eres todo un ingeniero de robots!'
+          : `Relacionaste las 5 partes con ${actErrors} intento(s) fallido(s). ¡Buen trabajo!`;
+      document.getElementById('act-play-view').classList.add('hidden');
+      document.getElementById('act-result-view').classList.remove('hidden');
+      playSound('success');
+
+      desbloquear('evaluacion', '¡Actividad completada! La evaluación se desbloqueó 🔓');
+    }
+
+    // =========================================================================
+    // LÓGICA DE EVALUACIÓN FORMATIVA (P1 A P5 CON RETROALIMENTACIÓN)
+    // =========================================================================
+    let preguntasSesion = PREGUNTAS;
+    function startEvaluacion() {
+      preguntasSesion = shuffleArray(PREGUNTAS);   // el orden de las preguntas cambia en cada intento
+      currentQuestionIdx = 0;
+      quizScore = 0;
+      questionAnswered = false;
+      goToScreen('screen-evaluacion');
+      document.getElementById('eval-question-view').classList.remove('hidden');
+      document.getElementById('eval-result-view').classList.add('hidden');
+      renderQuestion();
+    }
+
+    function renderQuestion() {
+      const q = preguntasSesion[currentQuestionIdx];
+      questionAnswered = false;
+
+      document.getElementById('eval-progress-badge').textContent = `Pregunta ${currentQuestionIdx + 1} de ${preguntasSesion.length}`;
+      document.getElementById('eval-score-badge').textContent = `Aciertos: ${quizScore}`;
+      document.getElementById('eval-question-text').textContent = q.pregunta;
+      document.getElementById('eval-feedback-box').classList.add('hidden');
+
+      const optsEl = document.getElementById('eval-options-container');
+      // Las opciones se muestran en orden aleatorio (idx = posición original, usada para corregir)
+      const orden = shuffleArray(q.opciones.map((_, i) => i));
+      optsEl.innerHTML = orden.map((idx, pos) => `
+        <button onclick="selectOption(${idx})" id="opt-btn-${idx}" class="w-full text-left p-4 rounded-2xl border-2 border-slate-200 bg-white hover:border-sky-400 hover:bg-sky-50 font-semibold text-slate-700 transition flex items-center justify-between">
+          <span>${q.opciones[idx].replace(/^OP\d+:\s*/, '')}</span>
+          <span class="w-7 h-7 rounded-full border-2 border-slate-300 flex items-center justify-center text-xs font-bold text-slate-400">${pos + 1}</span>
+        </button>
+      `).join('');
+    }
+
+    function selectOption(selectedIdx) {
+      if (questionAnswered) return;
+      questionAnswered = true;
+
+      const q = preguntasSesion[currentQuestionIdx];
+      const isCorrect = selectedIdx === q.correcta;
+
+      if (isCorrect) {
+        quizScore++;
+        playSound('success');
+      } else {
+        playSound('error');
+      }
+
+      document.getElementById('eval-score-badge').textContent = `Aciertos: ${quizScore}`;
+
+      // Estilizar botones
+      q.opciones.forEach((_, idx) => {
+        const btn = document.getElementById(`opt-btn-${idx}`);
+        btn.disabled = true;
+        if (idx === q.correcta && isCorrect) {
+          btn.className = "w-full text-left p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50 font-bold text-emerald-900 flex items-center justify-between";
+        } else if (idx === selectedIdx && !isCorrect) {
+          btn.className = "w-full text-left p-4 rounded-2xl border-2 border-rose-500 bg-rose-50 font-bold text-rose-900 flex items-center justify-between";
+        } else {
+          btn.className = "w-full text-left p-4 rounded-2xl border-2 border-slate-200 bg-slate-50 text-slate-400 flex items-center justify-between";
+        }
+      });
+
+      // Mostrar R Positiva o R Negativa del diagrama
+      const fbBox = document.getElementById('eval-feedback-box');
+      fbBox.classList.remove('hidden');
+      if (isCorrect) {
+        fbBox.className = "mt-5 p-4 rounded-2xl border-2 border-emerald-400 bg-emerald-50/95";
+        document.getElementById('eval-feedback-emoji').textContent = "😊";
+        document.getElementById('eval-feedback-title').textContent = "¡R Positiva! Respuesta Correcta";
+        document.getElementById('eval-feedback-title').className = "font-game text-lg font-bold text-emerald-800";
+      } else {
+        fbBox.className = "mt-5 p-4 rounded-2xl border-2 border-rose-400 bg-rose-50/95";
+        document.getElementById('eval-feedback-emoji').textContent = "😟";
+        document.getElementById('eval-feedback-title').textContent = "Respuesta incorrecta";
+        document.getElementById('eval-feedback-title').className = "font-game text-lg font-bold text-rose-800";
+      }
+      // Solo se explica cuando acierta; si falla no se revela la respuesta correcta
+      document.getElementById('eval-feedback-text').textContent = isCorrect
+        ? q.explicacion
+        : 'Esa no es la respuesta. Recuerda repasar los contenidos del robot.';
+    }
+
+    function nextQuestion() {
+      playSound('click');
+      if (currentQuestionIdx < preguntasSesion.length - 1) {
+        currentQuestionIdx++;
+        renderQuestion();
+      } else {
+        showFinalResults();
+      }
+    }
+
+    function showFinalResults(soloVer = false) {
+      document.getElementById('eval-question-view').classList.add('hidden');
+      document.getElementById('eval-result-view').classList.remove('hidden');
+
+      const iconBadge = document.getElementById('result-icon-badge');
+      const scorePill = document.getElementById('result-score-pill');
+      const titleEl = document.getElementById('result-title');
+      const msgEl = document.getElementById('result-message');
+      const actionsEl = document.getElementById('result-actions');
+
+      scorePill.textContent = `Aciertos obtenidos: ${quizScore} de ${PREGUNTAS.length}`;
+
+      if (!soloVer) {
+        if (quizScore === PREGUNTAS.length || quizScore === 3) {
+          evalPerfecta = true;                       // Evaluación cerrada: no se puede repetir
+        } else if (quizScore < 3) {
+          evalRequiereRepaso = true;                 // Se bloquea hasta repasar o ver el vídeo
+          repasoPostEval = new Set();
+          BLOQUEOS.evaluacion.bloqueada = true;
+        }
+      }
+
+      // Retroalimentación diferenciada: 5/5 (cerrada) · 3-4 (aprobada) · menos de 3 (repasar)
+      if (quizScore === PREGUNTAS.length) {
+        playSound('success');
+        iconBadge.className = "w-24 h-24 mx-auto rounded-full bg-emerald-100 border-4 border-emerald-400 flex items-center justify-center text-5xl shadow-lg";
+        iconBadge.textContent = "🏆";
+        scorePill.className = "inline-block px-4 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-sm mb-2";
+        titleEl.textContent = "¡Felicitaciones! Lograste el puntaje perfecto";
+        titleEl.className = "font-game text-2xl sm:text-3xl font-bold text-emerald-700";
+        msgEl.textContent = "Respondiste correctamente las 5 preguntas: dominas el cerebro CPU, los sensores, los servomotores, el chasis y la batería del robot. ¡Un logro excelente, sigue así! Esta evaluación quedó completada y ya no se puede volver a rendir.";
+        actionsEl.innerHTML = `
+          <button onclick="goToScreen('screen-menu')" class="btn-glossy-green px-7 py-3 rounded-full text-white font-game font-bold flex items-center gap-2">
+            <i class="fa-solid fa-house"></i> Volver al Menú
+          </button>
+        `;
+      } else if (quizScore < 3) {
+        playSound('error');
+        iconBadge.className = "w-24 h-24 mx-auto rounded-full bg-amber-100 border-4 border-amber-400 flex items-center justify-center text-5xl shadow-lg";
+        iconBadge.textContent = "💡";
+        scorePill.className = "inline-block px-4 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-sm mb-2";
+        titleEl.textContent = "¡Sigue Practicando! Puedes Mejorar";
+        titleEl.className = "font-game text-2xl sm:text-3xl font-bold text-amber-700";
+        msgEl.textContent = "Obtuviste menos de 3 aciertos. La evaluación quedó bloqueada: repasa los 5 contenidos del robot en 3D o mira el vídeo completo para desbloquearla e intentarlo de nuevo.";
+        actionsEl.innerHTML = `
+          <button onclick="openContenido(0)" class="btn-glossy-cyan px-6 py-3 rounded-full text-white font-game font-bold flex items-center gap-2">
+            <i class="fa-solid fa-cubes"></i> Repasar contenidos
+          </button>
+          <button onclick="goToScreen('screen-video')" class="btn-glossy-purple px-6 py-3 rounded-full text-white font-game font-bold flex items-center gap-2">
+            <i class="fa-solid fa-film"></i> Ver el vídeo
+          </button>
+          <button onclick="goToScreen('screen-menu')" class="btn-glossy-green px-6 py-3 rounded-full text-white font-game font-bold flex items-center gap-2">
+            <i class="fa-solid fa-house"></i> Volver al Menú
+          </button>
+        `;
+      } else if (quizScore === 3) {
+        playSound('success');
+        iconBadge.className = "w-24 h-24 mx-auto rounded-full bg-sky-100 border-4 border-sky-400 flex items-center justify-center text-5xl shadow-lg";
+        iconBadge.textContent = "🎖️";
+        scorePill.className = "inline-block px-4 py-1 rounded-full bg-sky-100 text-sky-800 font-bold text-sm mb-2";
+        titleEl.textContent = "¡Bien hecho! Evaluación Superada";
+        titleEl.className = "font-game text-2xl sm:text-3xl font-bold text-sky-700";
+        msgEl.textContent = "Lograste 3 aciertos y comprendes las ideas principales sobre las partes del robot. Esta evaluación quedó completada y ya no se puede volver a rendir.";
+        actionsEl.innerHTML = `
+          <button onclick="goToScreen('screen-menu')" class="btn-glossy-green px-7 py-3 rounded-full text-white font-game font-bold flex items-center gap-2">
+            <i class="fa-solid fa-house"></i> Volver al Menú
+          </button>
+        `;
+      } else {
+        playSound('success');
+        iconBadge.className = "w-24 h-24 mx-auto rounded-full bg-sky-100 border-4 border-sky-400 flex items-center justify-center text-5xl shadow-lg";
+        iconBadge.textContent = "🎖️";
+        scorePill.className = "inline-block px-4 py-1 rounded-full bg-sky-100 text-sky-800 font-bold text-sm mb-2";
+        titleEl.textContent = "¡Casi perfecto! Vuelve a intentarlo";
+        titleEl.className = "font-game text-2xl sm:text-3xl font-bold text-sky-700";
+        msgEl.textContent = "Obtuviste 4 aciertos, ¡estás muy cerca! Vuelve a intentarlo para lograr las 5 respuestas correctas.";
+        actionsEl.innerHTML = `
+          <button onclick="startEvaluacion()" class="btn-glossy-cyan px-6 py-3 rounded-full text-white font-game font-bold flex items-center gap-2">
+            <i class="fa-solid fa-rotate-right"></i> Intentar de nuevo
+          </button>
+          <button onclick="goToScreen('screen-menu')" class="btn-glossy-green px-6 py-3 rounded-full text-white font-game font-bold flex items-center gap-2">
+            <i class="fa-solid fa-house"></i> Volver al Menú
+          </button>
+        `;
+      }
+    }
+
+    // =========================================================================
+    // MOTOR GRÁFICO 3D (THREE.JS + ORBITCONTROLS + ROBOT CYBERLAB DETALLADO)
+    // =========================================================================
+    let scene, camera, renderer, controls, clock;
+    let robotRoot, headGroup, torsoGroup, armLeftGroup, armRightGroup, legLeftGroup, legRightGroup;
+    let cpuGroup, sensorsGroup, batteryGroup, dorsalHatchLeft, dorsalHatchRight;
+    let gearLeftMain, gearLeftPinion, gearRightMain, gearRightPinion;
+    let sensorWave1, sensorWave2, cpuLedMat, holoRingOuter, holoRingInner, holoParticles;
+    let headShellMat, torsoShellMat;
+    let clouds = [];
+
+    let isCameraTransitioning = false;
+    let targetCamPos = null;
+    let targetLookAt = null;
+
+    function focusCameraOn(pos, lookAt) {
+      if (typeof THREE === 'undefined') return;
+      targetCamPos = new THREE.Vector3(pos.x, pos.y, pos.z);
+      targetLookAt = new THREE.Vector3(lookAt.x, lookAt.y, lookAt.z);
+      isCameraTransitioning = true;
+    }
+
+    function resetCameraView() {
+      playSound('click');
+      focusCameraOn({ x: 0, y: 1.38, z: 4.65 }, { x: 0, y: 1.15, z: 0 });
+    }
+
+    function setExplodedState(state) {
+      isExploded = state;
+      const btnPortada = document.getElementById('btn-portada-explode');
+      const btnCont = document.getElementById('btn-contenido-explode');
+      if (btnPortada) {
+        btnPortada.innerHTML = isExploded
+          ? '<i class="fa-solid fa-compress"></i> Cerrar Despiece'
+          : '<i class="fa-solid fa-cubes"></i> Despiece 3D';
+      }
+      if (btnCont) {
+        btnCont.innerHTML = isExploded
+          ? '<i class="fa-solid fa-compress"></i> <span>Cerrar Despiece</span>'
+          : '<i class="fa-solid fa-cubes"></i> <span>Ver Despiece 3D</span>';
+      }
+    }
+
+    function toggleExplode() {
+      playSound('click');
+      setExplodedState(!isExploded);
+    }
+
+    // Geometría de caja con bordes redondeados sin desbordar sus dimensiones
+    function createRoundedBox(width, height, depth, radius, smoothness) {
+      const shape = new THREE.Shape();
+      const eps = 0.0001;
+      const maxR = Math.min(width / 2 - eps, height / 2 - eps, depth / 2 - eps);
+      const r = Math.max(eps, Math.min(radius, maxR));
+      const bevel = r * 0.55;
+      const cornerR = Math.max(eps, r - bevel);
+
+      const halfW = width / 2 - bevel;
+      const halfH = height / 2 - bevel;
+      const innerW = Math.max(0, halfW - cornerR);
+      const innerH = Math.max(0, halfH - cornerR);
+
+      shape.moveTo(-innerW, -halfH);
+      shape.lineTo(innerW, -halfH);
+      shape.absarc(innerW, -innerH, cornerR, -Math.PI / 2, 0, false);
+      shape.lineTo(halfW, innerH);
+      shape.absarc(innerW, innerH, cornerR, 0, Math.PI / 2, false);
+      shape.lineTo(-innerW, halfH);
+      shape.absarc(-innerW, innerH, cornerR, Math.PI / 2, Math.PI, false);
+      shape.lineTo(-halfW, -innerH);
+      shape.absarc(-innerW, -innerH, cornerR, Math.PI, Math.PI * 1.5, false);
+
+      const extrudeSettings = {
+        depth: Math.max(eps, depth - bevel * 2),
+        bevelEnabled: true,
+        bevelSegments: smoothness || 5,
+        steps: 1,
+        bevelSize: bevel,
+        bevelThickness: bevel,
+        curveSegments: smoothness || 8
+      };
+
+      const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geometry.center();
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    function createGearMesh(radius, thickness, teethCount, material) {
+      const group = new THREE.Group();
+      const core = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.78, radius * 0.78, thickness, 20), material);
+      core.rotation.z = Math.PI / 2;
+      group.add(core);
+
+      const toothGeo = new THREE.BoxGeometry(thickness * 0.95, radius * 0.34, radius * 0.24);
+      for (let i = 0; i < teethCount; i++) {
+        const angle = (i / teethCount) * Math.PI * 2;
+        const tooth = new THREE.Mesh(toothGeo, material);
+        tooth.position.set(0, Math.cos(angle) * radius * 0.88, Math.sin(angle) * radius * 0.88);
+        tooth.rotation.x = -angle;
+        group.add(tooth);
+      }
+      return group;
+    }
+
+    function init3DScene() {
+      const container = document.getElementById('canvas-container');
+      if (!container || typeof THREE === 'undefined') return;
+
+      const width = container.clientWidth || window.innerWidth || 800;
+      const height = container.clientHeight || window.innerHeight || 600;
+
+      clock = new THREE.Clock();
+
+      // 1. Escena y cielo del laboratorio CyberLab
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x60a5fa);
+      scene.fog = new THREE.FogExp2(0x93c5fd, 0.028);
+
+      // 2. Cámara
+      camera = new THREE.PerspectiveCamera(44, width / height, 0.1, 100);
+      camera.position.set(0, 1.38, 4.65);
+
+      // 3. Renderizador WebGL
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.innerHTML = '';
+      container.appendChild(renderer.domElement);
+
+      // 4. Controles de Rotación 360° y Zoom
+      if (typeof THREE.OrbitControls !== 'undefined') {
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.07;
+        controls.enablePan = false;
+        controls.minDistance = 2.1;
+        controls.maxDistance = 8.5;
+        controls.maxPolarAngle = Math.PI / 2 - 0.04;
+        controls.target.set(0, 1.15, 0);
+        controls.addEventListener('start', () => {
+          isCameraTransitioning = false;
+        });
+      }
+
+      // 5. Iluminación de estudio 3D
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0x3b82f6, 0.9);
+      hemiLight.position.set(0, 15, 0);
+      scene.add(hemiLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
+      dirLight.position.set(4.5, 8.5, 5.5);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 1024;
+      dirLight.shadow.mapSize.height = 1024;
+      dirLight.shadow.camera.near = 1;
+      dirLight.shadow.camera.far = 22;
+      scene.add(dirLight);
+
+      const rimCyan = new THREE.PointLight(0x22d3ee, 0.85, 10);
+      rimCyan.position.set(-3.2, 2.4, -2.5);
+      scene.add(rimCyan);
+
+      const rimCoral = new THREE.PointLight(0xfb7185, 0.65, 10);
+      rimCoral.position.set(3.2, 2.0, -2.0);
+      scene.add(rimCoral);
+
+      // 6. Entorno: Cuadrícula de laboratorio + Plataforma Holográfica + Nubes
+      buildEnvironment();
+
+      // 7. Modelo 3D del Robot CyberLab
+      buildRobot3D();
+
+      // Clic rápido en el robot para alternar despiece 3D
+      let downPos = { x: 0, y: 0 };
+      renderer.domElement.addEventListener('pointerdown', (e) => {
+        downPos = { x: e.clientX, y: e.clientY };
+      });
+      renderer.domElement.addEventListener('pointerup', (e) => {
+        const dist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+        if (dist < 5 && (currentScreen === 'screen-portada' || currentScreen === 'screen-contenido')) {
+          const rect = renderer.domElement.getBoundingClientRect();
+          const mouse = new THREE.Vector2(
+            ((e.clientX - rect.left) / rect.width) * 2 - 1,
+            -((e.clientY - rect.top) / rect.height) * 2 + 1
+          );
+          const raycaster = new THREE.Raycaster();
+          raycaster.setFromCamera(mouse, camera);
+          const hits = raycaster.intersectObjects(robotRoot.children, true);
+          if (hits.length > 0) {
+            toggleExplode();
+          }
+        }
+      });
+
+      window.addEventListener('resize', onWindowResize);
+      animate();
+    }
+
+    function buildEnvironment() {
+      // Suelo técnico oscuro con cuadrícula
+      const floorGeo = new THREE.CylinderGeometry(5.6, 5.6, 0.16, 48);
+      const floorMat = new THREE.MeshStandardMaterial({
+        color: 0x334155,
+        roughness: 0.65,
+        metalness: 0.25
+      });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.position.y = -0.08;
+      floor.receiveShadow = true;
+      scene.add(floor);
+
+      const gridHelper = new THREE.GridHelper(9.6, 24, 0x38bdf8, 0x64748b);
+      gridHelper.position.y = 0.005;
+      scene.add(gridHelper);
+
+      // Aros holográficos debajo del robot
+      const outerGeo = new THREE.RingGeometry(0.95, 1.06, 48);
+      const outerMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
+      holoRingOuter = new THREE.Mesh(outerGeo, outerMat);
+      holoRingOuter.rotation.x = -Math.PI / 2;
+      holoRingOuter.position.y = 0.012;
+      scene.add(holoRingOuter);
+
+      const innerGeo = new THREE.RingGeometry(0.65, 0.72, 36);
+      const innerMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
+      holoRingInner = new THREE.Mesh(innerGeo, innerMat);
+      holoRingInner.rotation.x = -Math.PI / 2;
+      holoRingInner.position.y = 0.015;
+      scene.add(holoRingInner);
+
+      // Partículas flotantes
+      const pCount = 45;
+      const pGeo = new THREE.BufferGeometry();
+      const positions = new Float32Array(pCount * 3);
+      for (let i = 0; i < pCount; i++) {
+        const angle = (i / pCount) * Math.PI * 2;
+        const rad = 1.15 + Math.random() * 1.4;
+        positions[i * 3] = Math.cos(angle) * rad;
+        positions[i * 3 + 1] = 0.2 + Math.random() * 2.4;
+        positions[i * 3 + 2] = Math.sin(angle) * rad;
+      }
+      pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const pMat = new THREE.PointsMaterial({ color: 0x67e8f9, size: 0.055, transparent: true, opacity: 0.8 });
+      holoParticles = new THREE.Points(pGeo, pMat);
+      scene.add(holoParticles);
+
+      // Nubes suaves 3D en el horizonte
+      const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0.0 });
+      const cloudPositions = [
+        { x: -5.5, y: 4.2, z: -7.5, s: 1.1 },
+        { x: 5.2, y: 4.5, z: -8.0, s: 1.25 },
+        { x: -2.5, y: 5.2, z: -9.5, s: 0.95 },
+        { x: 3.0, y: 3.6, z: -6.8, s: 0.85 }
+      ];
+      cloudPositions.forEach(cp => {
+        const cg = new THREE.Group();
+        const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.7, 14, 14), cloudMat);
+        const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 14), cloudMat);
+        b2.position.set(0.65, -0.1, 0.1);
+        const b3 = new THREE.Mesh(new THREE.SphereGeometry(0.52, 14, 14), cloudMat);
+        b3.position.set(-0.65, -0.12, 0.05);
+        cg.add(b1, b2, b3);
+        cg.position.set(cp.x, cp.y, cp.z);
+        cg.scale.setScalar(cp.s);
+        scene.add(cg);
+        clouds.push(cg);
+      });
+    }
+
+    function buildRobot3D() {
+      robotRoot = new THREE.Group();
+      scene.add(robotRoot);
+
+      // Materiales principales (opacos en portada/normal para evitar fallos visuales)
+      headShellMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.2,
+        metalness: 0.06,
+        transparent: false,
+        opacity: 1.0
+      });
+      torsoShellMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.22,
+        metalness: 0.06,
+        transparent: false,
+        opacity: 1.0
+      });
+
+      const redArmorMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.24, metalness: 0.15 });
+      const darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.35, metalness: 0.65 });
+      const chromeMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.2, metalness: 0.85 });
+      const goldMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.25, metalness: 0.8 });
+      const cyanGlowMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee });
+
+      // -----------------------------------------------------------------------
+      // 1. PIERNAS Y BOTAS ARTICULADAS
+      // -----------------------------------------------------------------------
+      function createLeg(isLeft) {
+        const legG = new THREE.Group();
+        const sign = isLeft ? -1 : 1;
+        legG.position.set(sign * 0.22, 0.42, 0);
+
+        // Pistón / muslo metálico
+        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.26, 16), chromeMat);
+        thigh.position.y = 0.06;
+        legG.add(thigh);
+
+        // Rótula dorada
+        const knee = new THREE.Mesh(new THREE.SphereGeometry(0.085, 14, 14), goldMat);
+        knee.position.y = -0.05;
+        legG.add(knee);
+
+        // Bota blanca redondeada
+        const boot = new THREE.Mesh(createRoundedBox(0.26, 0.20, 0.34, 0.06, 5), headShellMat);
+        boot.position.set(0, -0.22, 0.04);
+        boot.castShadow = true;
+        legG.add(boot);
+
+        // Detalle rojo frontal y suela cyan
+        const toeCap = new THREE.Mesh(createRoundedBox(0.22, 0.08, 0.12, 0.02, 4), redArmorMat);
+        toeCap.position.set(0, -0.22, 0.17);
+        legG.add(toeCap);
+
+        const sole = new THREE.Mesh(createRoundedBox(0.27, 0.04, 0.35, 0.015, 3), darkMetalMat);
+        sole.position.set(0, -0.32, 0.04);
+        legG.add(sole);
+
+        return legG;
+      }
+
+      legLeftGroup = createLeg(true);
+      legRightGroup = createLeg(false);
+      robotRoot.add(legLeftGroup, legRightGroup);
+
+      // -----------------------------------------------------------------------
+      // 2. TORSO (CHASIS) + COMPARTIMIENTO DORSAL + BATERÍA LIPO
+      // -----------------------------------------------------------------------
+      torsoGroup = new THREE.Group();
+      torsoGroup.position.set(0, 0.84, 0);
+      robotRoot.add(torsoGroup);
+
+      // Carcasa frontal y lateral del torso
+      const chestShell = new THREE.Mesh(createRoundedBox(0.76, 0.62, 0.56, 0.14, 6), torsoShellMat);
+      chestShell.castShadow = true;
+      torsoGroup.add(chestShell);
+
+      // Franja roja superior y emblema circular en el pecho
+      const collarRed = new THREE.Mesh(createRoundedBox(0.64, 0.09, 0.50, 0.03, 4), redArmorMat);
+      collarRed.position.set(0, 0.28, 0.01);
+      torsoGroup.add(collarRed);
+
+      const badgeRing = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.05, 24), redArmorMat);
+      badgeRing.rotation.x = Math.PI / 2;
+      badgeRing.position.set(0, 0.04, 0.27);
+      torsoGroup.add(badgeRing);
+
+      const badgeCore = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.06, 20), cyanGlowMat);
+      badgeCore.rotation.x = Math.PI / 2;
+      badgeCore.position.set(0, 0.04, 0.275);
+      torsoGroup.add(badgeCore);
+
+      // Cintura mecánica
+      const pelvis = new THREE.Mesh(createRoundedBox(0.56, 0.14, 0.44, 0.04, 4), darkMetalMat);
+      pelvis.position.set(0, -0.33, 0);
+      torsoGroup.add(pelvis);
+
+      // Compuertas dorsales rojas animadas (se abren en despiece)
+      dorsalHatchLeft = new THREE.Group();
+      dorsalHatchLeft.position.set(-0.26, 0.02, -0.27);
+      const hatchLMesh = new THREE.Mesh(createRoundedBox(0.24, 0.44, 0.05, 0.02, 3), redArmorMat);
+      hatchLMesh.position.set(0.12, 0, 0);
+      dorsalHatchLeft.add(hatchLMesh);
+
+      dorsalHatchRight = new THREE.Group();
+      dorsalHatchRight.position.set(0.26, 0.02, -0.27);
+      const hatchRMesh = new THREE.Mesh(createRoundedBox(0.24, 0.44, 0.05, 0.02, 3), redArmorMat);
+      hatchRMesh.position.set(-0.12, 0, 0);
+      dorsalHatchRight.add(hatchRMesh);
+
+      torsoGroup.add(dorsalHatchLeft, dorsalHatchRight);
+
+      // BATERÍA LIPO INTERNA (Sistema 5: Energía)
+      batteryGroup = new THREE.Group();
+      batteryGroup.position.set(0, 0.02, -0.04);
+      torsoGroup.add(batteryGroup);
+
+      const batBody = new THREE.Mesh(
+        createRoundedBox(0.36, 0.38, 0.20, 0.03, 4),
+        new THREE.MeshStandardMaterial({ color: 0x059669, roughness: 0.3, metalness: 0.2 })
+      );
+      batteryGroup.add(batBody);
+
+      // Indicador LED de carga de 4 barras
+      for (let b = 0; b < 4; b++) {
+        const bar = new THREE.Mesh(
+          new THREE.BoxGeometry(0.22, 0.045, 0.02),
+          new THREE.MeshBasicMaterial({ color: 0x4ade80 })
+        );
+        bar.position.set(0, -0.11 + b * 0.075, -0.105);
+        batteryGroup.add(bar);
+      }
+
+      // Cables rojo (+) y negro (-)
+      const cableRed = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.16, 10), redArmorMat);
+      cableRed.position.set(-0.08, 0.24, -0.02);
+      const cableBlack = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.16, 10), darkMetalMat);
+      cableBlack.position.set(0.08, 0.24, -0.02);
+      batteryGroup.add(cableRed, cableBlack);
+
+      // Cuello hidráulico articulado
+      const neckCol = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.16, 18), darkMetalMat);
+      neckCol.position.set(0, 0.36, 0);
+      torsoGroup.add(neckCol);
+
+      // -----------------------------------------------------------------------
+      // 3. BRAZOS + SERVOMOTORES Y ENGRANAJES (Sistema 3: Músculos)
+      // -----------------------------------------------------------------------
+      function createArm(isLeft) {
+        const armG = new THREE.Group();
+        const sign = isLeft ? -1 : 1;
+        armG.position.set(sign * 0.46, 0.96, 0);
+
+        // Carcasa del servomotor de hombro
+        const servoHousing = new THREE.Mesh(createRoundedBox(0.18, 0.22, 0.20, 0.04, 4), darkMetalMat);
+        armG.add(servoHousing);
+
+        // Engranajes visibles
+        const mainGear = createGearMesh(0.085, 0.04, 10, goldMat);
+        mainGear.position.set(sign * 0.09, 0.02, 0);
+        const pinionGear = createGearMesh(0.055, 0.04, 8, chromeMat);
+        pinionGear.position.set(sign * 0.09, -0.08, 0.05);
+        armG.add(mainGear, pinionGear);
+
+        if (isLeft) {
+          gearLeftMain = mainGear;
+          gearLeftPinion = pinionGear;
+        } else {
+          gearRightMain = mainGear;
+          gearRightPinion = pinionGear;
+        }
+
+        // Antebrazo blanco
+        const forearm = new THREE.Mesh(createRoundedBox(0.17, 0.28, 0.18, 0.05, 5), headShellMat);
+        forearm.position.set(sign * 0.04, -0.22, 0);
+        forearm.castShadow = true;
+        armG.add(forearm);
+
+        // Aro luminoso en muñeca y mano roja
+        const wristRing = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.015, 10, 20), cyanGlowMat);
+        wristRing.rotation.x = Math.PI / 2;
+        wristRing.position.set(sign * 0.04, -0.36, 0);
+        armG.add(wristRing);
+
+        const hand = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 16), redArmorMat);
+        hand.position.set(sign * 0.04, -0.43, 0);
+        armG.add(hand);
+
+        return armG;
+      }
+
+      armLeftGroup = createArm(true);
+      armRightGroup = createArm(false);
+      robotRoot.add(armLeftGroup, armRightGroup);
+
+      // -----------------------------------------------------------------------
+      // 4. CABEZA CHIBI + CPU INTERNA + SENSORES ULTRASÓNICOS
+      // -----------------------------------------------------------------------
+      headGroup = new THREE.Group();
+      headGroup.position.set(0, 1.60, 0);
+      robotRoot.add(headGroup);
+
+      // Casco blanco redondeado
+      const headShell = new THREE.Mesh(createRoundedBox(1.22, 0.88, 0.88, 0.22, 7), headShellMat);
+      headShell.castShadow = true;
+      headGroup.add(headShell);
+
+      // Cresta superior roja
+      const crest = new THREE.Mesh(createRoundedBox(0.54, 0.09, 0.42, 0.035, 4), redArmorMat);
+      crest.position.set(0, 0.43, 0.02);
+      headGroup.add(crest);
+
+      // Auriculares laterales grises
+      [-1, 1].forEach(sign => {
+        const earBase = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.14, 24), darkMetalMat);
+        earBase.rotation.z = Math.PI / 2;
+        earBase.position.set(sign * 0.62, 0, 0);
+        headGroup.add(earBase);
+
+        const earRing = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.022, 12, 24), chromeMat);
+        earRing.rotation.y = Math.PI / 2;
+        earRing.position.set(sign * 0.69, 0, 0);
+        headGroup.add(earRing);
+      });
+
+      // Pantalla Visera Oscura Frontal
+      const visor = new THREE.Mesh(
+        createRoundedBox(0.94, 0.60, 0.07, 0.14, 5),
+        new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.12, metalness: 0.35 })
+      );
+      visor.position.set(0, -0.01, 0.42);
+      headGroup.add(visor);
+
+      // Ojos digitales cyan expresivos
+      [-0.20, 0.20].forEach(ex => {
+        const eye = new THREE.Mesh(createRoundedBox(0.14, 0.22, 0.02, 0.05, 4), cyanGlowMat);
+        eye.position.set(ex, 0.0, 0.46);
+        headGroup.add(eye);
+
+        const glint = new THREE.Mesh(
+          new THREE.CircleGeometry(0.025, 12),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        glint.position.set(ex - 0.03, 0.06, 0.472);
+        headGroup.add(glint);
+      });
+
+      // CEREBRO CPU INTERNO (Sistema 1: Microcontrolador)
+      cpuGroup = new THREE.Group();
+      cpuGroup.position.set(0, 0.06, 0);
+      headGroup.add(cpuGroup);
+
+      const pcbBoard = new THREE.Mesh(
+        createRoundedBox(0.46, 0.05, 0.42, 0.015, 3),
+        new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.35, metalness: 0.3 })
+      );
+      cpuGroup.add(pcbBoard);
+
+      const cpuChip = new THREE.Mesh(createRoundedBox(0.22, 0.06, 0.22, 0.01, 2), darkMetalMat);
+      cpuChip.position.y = 0.04;
+      cpuGroup.add(cpuChip);
+
+      // Pines dorados alrededor del chip
+      for (let p = -2; p <= 2; p++) {
+        const pinX = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.28), goldMat);
+        pinX.position.set(p * 0.04, 0.03, 0);
+        const pinZ = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.02, 0.02), goldMat);
+        pinZ.position.set(0, 0.03, p * 0.04);
+        cpuGroup.add(pinX, pinZ);
+      }
+
+      cpuLedMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee });
+      const cpuLed = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 10), cpuLedMat);
+      cpuLed.position.set(0.16, 0.045, 0.14);
+      cpuGroup.add(cpuLed);
+
+      // SENSORES ULTRASÓNICOS (Sistema 2: Sentidos)
+      sensorsGroup = new THREE.Group();
+      sensorsGroup.position.set(0, 0.21, 0.45);
+      headGroup.add(sensorsGroup);
+
+      [-0.14, 0.14].forEach(sx => {
+        const transducer = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.06, 18), chromeMat);
+        transducer.rotation.x = Math.PI / 2;
+        transducer.position.set(sx, 0, 0.02);
+        sensorsGroup.add(transducer);
+
+        const meshCore = new THREE.Mesh(new THREE.CircleGeometry(0.042, 16), darkMetalMat);
+        meshCore.position.set(sx, 0, 0.052);
+        sensorsGroup.add(meshCore);
+      });
+
+      // Ondas ultrasónicas animadas
+      const waveMat1 = new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.0, side: THREE.DoubleSide });
+      const waveMat2 = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.0, side: THREE.DoubleSide });
+      sensorWave1 = new THREE.Mesh(new THREE.RingGeometry(0.14, 0.16, 28), waveMat1);
+      sensorWave1.position.set(0, 0, 0.08);
+      sensorWave2 = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.24, 28), waveMat2);
+      sensorWave2.position.set(0, 0, 0.14);
+      sensorsGroup.add(sensorWave1, sensorWave2);
+    }
+
+    function onWindowResize() {
+      const container = document.getElementById('canvas-container');
+      if (!container || !camera || !renderer) return;
+      const w = container.clientWidth || window.innerWidth || 800;
+      const h = container.clientHeight || window.innerHeight || 600;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (!renderer || !scene || !camera) return;
+
+      const elapsed = clock ? clock.getElapsedTime() : 0;
+
+      // Transición suave de cámara cuando se selecciona un capítulo/contenido
+      if (isCameraTransitioning && targetCamPos && targetLookAt) {
+        camera.position.lerp(targetCamPos, 0.08);
+        if (controls) {
+          controls.target.lerp(targetLookAt, 0.08);
+        } else {
+          camera.lookAt(targetLookAt);
+        }
+        if (camera.position.distanceTo(targetCamPos) < 0.03) {
+          isCameraTransitioning = false;
+        }
+      }
+
+      if (controls) {
+        controls.update();
+      }
+
+      if (robotRoot) {
+        // Respiración suave del robot
+        robotRoot.position.y = Math.sin(elapsed * 2.2) * 0.025;
+
+        // Giro continuo de los engranajes de los servomotores
+        if (gearLeftMain && gearLeftPinion && gearRightMain && gearRightPinion) {
+          gearLeftMain.rotation.x = elapsed * 1.8;
+          gearLeftPinion.rotation.x = -elapsed * 2.8;
+          gearRightMain.rotation.x = elapsed * 1.8;
+          gearRightPinion.rotation.x = -elapsed * 2.8;
+        }
+
+        // Parpadeo del LED de procesamiento de la CPU
+        if (cpuLedMat) {
+          const pulse = Math.sin(elapsed * 8) > 0;
+          cpuLedMat.color.setHex(pulse ? 0x22d3ee : 0xfacc15);
+        }
+
+        // Animación de ondas del sensor ultrasónico
+        if (sensorWave1 && sensorWave2) {
+          const showWaves = isExploded || (currentScreen === 'screen-contenido' && currentContenidoIdx === 1);
+          if (showWaves) {
+            const t1 = (elapsed * 1.4) % 1;
+            const t2 = (elapsed * 1.4 + 0.5) % 1;
+            sensorWave1.position.z = 0.06 + t1 * 0.35;
+            sensorWave1.scale.setScalar(0.8 + t1 * 0.9);
+            sensorWave1.material.opacity = (1 - t1) * 0.85;
+
+            sensorWave2.position.z = 0.06 + t2 * 0.35;
+            sensorWave2.scale.setScalar(0.8 + t2 * 0.9);
+            sensorWave2.material.opacity = (1 - t2) * 0.85;
+          } else {
+            sensorWave1.material.opacity = 0;
+            sensorWave2.material.opacity = 0;
+          }
+        }
+
+        // Animación de Despiece 3D (Exploded View)
+        const targetHeadY = isExploded ? 2.30 : 1.60;
+        const targetArmX = isExploded ? 0.82 : 0.46;
+        const targetBatZ = isExploded ? -0.68 : -0.04;
+        const targetLegX = isExploded ? 0.34 : 0.22;
+        const targetSensorsZ = isExploded ? 0.72 : 0.45;
+        const targetCpuY = isExploded ? 0.16 : 0.06;
+        const targetHatchAngle = isExploded ? 0.85 : 0.0;
+        const targetShellOpacity = isExploded ? 0.28 : 1.0;
+
+        headGroup.position.y += (targetHeadY - headGroup.position.y) * 0.1;
+        armLeftGroup.position.x += (-targetArmX - armLeftGroup.position.x) * 0.1;
+        armRightGroup.position.x += (targetArmX - armRightGroup.position.x) * 0.1;
+        batteryGroup.position.z += (targetBatZ - batteryGroup.position.z) * 0.1;
+        legLeftGroup.position.x += (-targetLegX - legLeftGroup.position.x) * 0.1;
+        legRightGroup.position.x += (targetLegX - legRightGroup.position.x) * 0.1;
+
+        if (sensorsGroup) {
+          sensorsGroup.position.z += (targetSensorsZ - sensorsGroup.position.z) * 0.1;
+        }
+        if (cpuGroup) {
+          cpuGroup.position.y += (targetCpuY - cpuGroup.position.y) * 0.1;
+        }
+        if (dorsalHatchLeft && dorsalHatchRight) {
+          dorsalHatchLeft.rotation.y += (-targetHatchAngle - dorsalHatchLeft.rotation.y) * 0.12;
+          dorsalHatchRight.rotation.y += (targetHatchAngle - dorsalHatchRight.rotation.y) * 0.12;
+        }
+
+        // Transparencia únicamente cuando está activado el despiece
+        headShellMat.opacity += (targetShellOpacity - headShellMat.opacity) * 0.12;
+        torsoShellMat.opacity += (targetShellOpacity - torsoShellMat.opacity) * 0.12;
+
+        const isTranslucent = headShellMat.opacity < 0.99 || torsoShellMat.opacity < 0.99;
+        if (headShellMat.transparent !== isTranslucent) {
+          headShellMat.transparent = isTranslucent;
+          headShellMat.depthWrite = !isTranslucent;
+          headShellMat.needsUpdate = true;
+        }
+        if (torsoShellMat.transparent !== isTranslucent) {
+          torsoShellMat.transparent = isTranslucent;
+          torsoShellMat.depthWrite = !isTranslucent;
+          torsoShellMat.needsUpdate = true;
+        }
+      }
+
+      // Rotación de plataforma holográfica, partículas y nubes
+      if (holoRingOuter && holoRingInner) {
+        holoRingOuter.rotation.z = elapsed * 0.5;
+        holoRingInner.rotation.z = -elapsed * 0.8;
+      }
+      if (holoParticles) {
+        holoParticles.rotation.y = elapsed * 0.25;
+      }
+      clouds.forEach((c, idx) => {
+        c.position.x += Math.sin(elapsed * 0.2 + idx) * 0.0015;
+      });
+
+      updatePartLabel();
+      renderer.render(scene, camera);
+    }
+
+    // Inicialización segura en carga de ventana
+    window.addEventListener('load', () => {
+      try {
+        init3DScene();
+      } catch (err) {
+        console.error('Error iniciando escena 3D:', err);
+      }
+    });
+  </script>
+</body>
+</html>
